@@ -12,8 +12,10 @@ git clone -b development --recurse-submodules https://gitlab.sh.nextgenwaterpred
 
 ### Build ngen.eval in Python virtual environment
 
+```bash
 cd [ROOT_DIR]/ngen-eval
 pip install .
+```
 
 where[ROOT_DIR] refers to the directory where ngen-eval is installed
 
