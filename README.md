@@ -1,21 +1,21 @@
 # ngen-eval
 
 ## Name
-ngen Evaluation (ngen.eval)
+NWM/NextGen Evaluation (nwm.eval)
 
 ## Description
-A python library for calculating metrics (from ngen.cal)
+A python library for calculating metrics
 
 ### Clone ngen-eval
 
-git clone -b development --recurse-submodules https://gitlab.sh.nextgenwaterprediction.com/NGWPC/nwm-ngen/ngen-eval.git
+git clone -b development --recurse-submodules https://github.com/NGWPC/nwm-eval-mgr.git
 
 ### Build ngen.eval in Python virtual environment
 
 ```bash
-cd [ROOT_DIR]/ngen-eval
+cd [ROOT_DIR]/nwm-eval-mgr
 pip install .
 ```
 
-where[ROOT_DIR] refers to the directory where ngen-eval is installed
+where[ROOT_DIR] refers to the directory where nwm-eval-mgr is installed
 
