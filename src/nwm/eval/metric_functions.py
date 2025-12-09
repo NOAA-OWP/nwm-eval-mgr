@@ -17,7 +17,12 @@ import scipy.stats as sp
 from hydrotools.metrics import metrics as hm
 from scipy.stats import pearsonr
 
-from .event_metric_functions import compute_event_metrics, identify_events, pair_events, separate_compound_events
+from .event_metric_functions import (
+    compute_event_metrics,
+    identify_events,
+    pair_events,
+    separate_compound_events,
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -89,7 +94,10 @@ def treat_values(
     # Replace zero values
     if replace_zero:
         if df[colnames[1:]].min().values.min() <= 0.0001:
-            df[colnames[1:]] = df[colnames[1:]] + 1.0 / 100.0 * df[colnames[1]].mean()
+            df[colnames[1:]] = (
+                df[colnames[1:]] + 1.0 / 100.0 * df[colnames[1]].mean()
+            )  # this treatment does not work when mean is zero
+            # df[colnames[1:]] = df[colnames[1:]] + 0.00001
 
     return df
 
@@ -340,8 +348,32 @@ def KGE(
         Journal of hydrology, 377(1-2), 80-91.
 
     """
+    mean_obs = np.mean(y_true)
+    mean_sim = np.mean(y_pred)
+    std_obs = np.std(y_true)
+    std_sim = np.std(y_pred)
 
-    return hm.kling_gupta_efficiency(y_true, y_pred, r_scale, a_scale, b_scale)
+    # Correlation
+    if std_obs == 0 or std_sim == 0:
+        r = np.nan
+    else:
+        r = np.corrcoef(y_true, y_pred)[0, 1]
+
+    # Variability ratio
+    alpha = np.nan if std_obs == 0 else std_sim / std_obs
+
+    # Bias ratio
+    beta = np.nan if mean_obs == 0 else mean_sim / mean_obs
+
+    # Kling-Gupta Efficiency
+    kge = 1 - np.sqrt(
+        r_scale * (r - 1) ** 2 + a_scale * (alpha - 1) ** 2 + b_scale * (beta - 1) ** 2
+    )
+
+    return kge
+
+    # avoid using hydrotools implementation due to potential ZeroDivisionError issues
+    # return hm.kling_gupta_efficiency(y_true, y_pred, r_scale, a_scale, b_scale)
 
 
 def pbias_fdc(
@@ -387,7 +419,9 @@ def pbias_fdc(
     y_pred_prob = np.arange(1, len(y_pred) + 1) / len(y_pred)
 
     # Compute pbias of peak flow segment of FDC (require same number of elements)
-    numerator = np.sum(np.subtract(y_pred_sort[y_pred_prob < pqthr], y_true_sort[y_true_prob < pqthr]))
+    numerator = np.sum(
+        np.subtract(y_pred_sort[y_pred_prob < pqthr], y_true_sort[y_true_prob < pqthr])
+    )
     denominator = np.sum(y_true_sort[y_true_prob < pqthr])
     if denominator != 0:
         pbias_hseg_fdc = numerator / denominator * 100
@@ -401,9 +435,9 @@ def pbias_fdc(
     term2 = y_pred_sort[np.abs(y_pred_prob - lqthr).argmin()]
     if term1 != 0 and term2 != 0:
         pred_term = np.log(term1) - np.log(term2)
-        denominator = np.log(y_true_sort[np.abs(y_true_prob - hqthr).argmin()]) - np.log(
-            y_true_sort[np.abs(y_true_prob - lqthr).argmin()]
-        )
+        denominator = np.log(
+            y_true_sort[np.abs(y_true_prob - hqthr).argmin()]
+        ) - np.log(y_true_sort[np.abs(y_true_prob - lqthr).argmin()])
         numerator = pred_term - denominator
         if denominator > 0:
             pbias_mseg_fdc = numerator / denominator * 100
@@ -414,7 +448,9 @@ def pbias_fdc(
     else:
         pbias_mseg_fdc = np.nan
         if warning_msg:
-            warnings.warn("'0 as argument for np.log', can't compute PBIAS for slope of FDC")
+            warnings.warn(
+                "'0 as argument for np.log', can't compute PBIAS for slope of FDC"
+            )
 
     # Compute pbias of low flow segment of FDC
     term1 = (y_pred_sort[y_pred_prob > bqthr]).min()
@@ -422,20 +458,33 @@ def pbias_fdc(
     term3 = (y_true_sort[y_true_prob > bqthr]).min()
     term4 = y_true_sort.min()
     if all([term1 != 0, term2 != 0, term3 != 0, term4 != 0]):
-        denominator = np.sum(np.log(y_true_sort[y_true_prob > bqthr]) - np.log(y_true_sort.min()))
-        numerator = np.sum(np.log(y_pred_sort[y_pred_prob > bqthr]) - np.log(y_pred_sort.min())) - denominator
+        denominator = np.sum(
+            np.log(y_true_sort[y_true_prob > bqthr]) - np.log(y_true_sort.min())
+        )
+        numerator = (
+            np.sum(np.log(y_pred_sort[y_pred_prob > bqthr]) - np.log(y_pred_sort.min()))
+            - denominator
+        )
         if denominator != 0:
             pbias_lseg_fdc = numerator / denominator * (-100)
         else:
             pbias_lseg_fdc = np.nan
             if warning_msg:
-                warnings.warn("'denominator = 0', can't compute PBIAS for low flow of FDC")
+                warnings.warn(
+                    "'denominator = 0', can't compute PBIAS for low flow of FDC"
+                )
     else:
         pbias_lseg_fdc = np.nan
         if warning_msg:
-            warnings.warn("'0 as argument for np.log', can't compute PBIAS for low flow of FDC")
+            warnings.warn(
+                "'0 as argument for np.log', can't compute PBIAS for low flow of FDC"
+            )
 
-    return {"HSEG_FDC": pbias_hseg_fdc, "MSEG_FDC": pbias_mseg_fdc, "LSEG_FDC": pbias_lseg_fdc}
+    return {
+        "HSEG_FDC": pbias_hseg_fdc,
+        "MSEG_FDC": pbias_mseg_fdc,
+        "LSEG_FDC": pbias_lseg_fdc,
+    }
 
 
 def categorical_score(
@@ -497,10 +546,18 @@ def event_based_metrics(
 
     # first resample the data into hourly, do interpolation with short periods of missing data
     y_true0 = y_true.copy()
-    y_true0 = y_true0.resample("h").first().interpolate(method="linear", limit=5, limit_direction="both")
+    y_true0 = (
+        y_true0.resample("h")
+        .first()
+        .interpolate(method="linear", limit=5, limit_direction="both")
+    )
 
     y_pred0 = y_pred.copy()
-    y_pred0 = y_pred0.resample("h").first().interpolate(method="linear", limit=5, limit_direction="both")
+    y_pred0 = (
+        y_pred0.resample("h")
+        .first()
+        .interpolate(method="linear", limit=5, limit_direction="both")
+    )
 
     # then break the data into a number of chunks without missing data,
     # so that event identification/pairing can be conducted separately for each chunk
@@ -508,7 +565,9 @@ def event_based_metrics(
     # 1) break the time series by NaN
     y_true_chunks = np.split(y_true0, np.where(np.isnan(y_true0))[0])
     # 2) remove NaN entries
-    y_true_chunks = [p1[~np.isnan(p1)] for p1 in y_true_chunks if not isinstance(p1, np.ndarray)]
+    y_true_chunks = [
+        p1[~np.isnan(p1)] for p1 in y_true_chunks if not isinstance(p1, np.ndarray)
+    ]
     # 3) remove series that are too short (for now, ignore chunks short than 10 hours)
     y_true_chunks = [p1 for p1 in y_true_chunks if len(p1) >= 10]
 
@@ -544,10 +603,16 @@ def event_based_metrics(
     if len(events_all) > 0:
         metrics = compute_event_metrics(events_all, y_true0, y_pred0, aggregation)
     else:
-        logger.warning("No paired events found and event-based metrics cannot be calculated")
+        logger.warning(
+            "No paired events found and event-based metrics cannot be calculated"
+        )
         return {"PKBIAS": np.nan, "PKTE": np.nan, "EVBIAS": np.nan}
 
-    return {"PKBIAS": metrics["peak_bias"], "PKTE": metrics["ptime_err"], "EVBIAS": metrics["event_bias"]}
+    return {
+        "PKBIAS": metrics["peak_bias"],
+        "PKTE": metrics["ptime_err"],
+        "EVBIAS": metrics["event_bias"],
+    }
 
 
 _all_metric_funcs = {
@@ -619,7 +684,6 @@ def calculate_metrics(
     result : dictionary of metric values
 
     """
-
     metrics_all = _all_metrics.keys()
     if not metrics:
         metrics1 = metrics_all
@@ -645,7 +709,9 @@ def calculate_metrics(
         elif m1 == "CORR":
             result.update({m1: f1(y_true, y_pred)[0]})
         elif m1 == "NSElog":
-            result.update({m1: f1(y_true, y_pred, fun="log", epsilon="Pushpalatha2012")})
+            result.update(
+                {m1: f1(y_true, y_pred, fun="log", epsilon="Pushpalatha2012")}
+            )
         elif m1 == "NNSE":
             result.update({m1: f1(y_true, y_pred, normalized=True)})
         elif m1 in ["POD", "FAR", "CSI", "FBIAS"]:
