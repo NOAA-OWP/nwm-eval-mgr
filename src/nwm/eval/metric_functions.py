@@ -68,11 +68,10 @@ def treat_values(
 
     References
     ----------
-    Pushpalatha, R., C. Perrin, N. L. Moine, V. Andreassian, 2012: A review of efficiency criteria suitable for evaluating low-flow simulations.
-        Journal of Hydrology, 420-421, 171-182.
+    Pushpalatha, R., C. Perrin, N. L. Moine, V. Andreassian, 2012: A review of efficiency criteria suitable
+        for evaluating low-flow simulations. Journal of Hydrology, 420-421, 171-182.
 
     """
-
     df = df.copy()
     colnames = list(df.columns)
 
@@ -142,7 +141,7 @@ def mean_abs_error(
 
     """
 
-    return np.sum(np.absolute(np.subtract(y_pred, y_true))) / len(y_true)
+    return np.nanmean(np.abs(y_pred - y_true))  # this handles NaN values appropriately
 
 
 def root_mean_squared_error(
@@ -165,7 +164,7 @@ def root_mean_squared_error(
     """
 
     # Compute mean squared error
-    MSE = np.sum(np.subtract(y_true, y_pred) ** 2.0) / len(y_true)
+    MSE = np.nanmean((y_true - y_pred) ** 2.0)  # this handles NaN values appropriately
 
     # Return RMSE, optionally return mean squared error
     if not root:
