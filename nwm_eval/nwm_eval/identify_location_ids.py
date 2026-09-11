@@ -1,0 +1,451 @@
+"""Functions to identify location IDs based on the provided crosswalk file.
+
+Functions:
+    - get_link_by_gage: Get location link ID (NWM feature or reach id) based on USGS gage ID and crosswalk file.
+    - get_gage_by_link: Get location gage ID (USGS gage ID) based on NWM link ID and crosswalk file.
+    - get_link_id_from_file: Get location link IDs (NWM feature or reach id) from locations in a file.
+    - get_locations_from_config_list: Get list of locations as either "gage" or "link" based on location_list provided in config file.
+    - get_nwm_link_ids: Get NWM link IDs for the locations defined in the config file based on the provided crosswalk file.
+    - get_gage_id_from_file: Get location gage ID (USGS gage ID) from a file based on the provided crosswalk file.
+    - identify_locations: Identify location IDs based on the provided crosswalk file.
+    - get_gage_ids: Get gage IDs for the locations defined in the config file based on the provided crosswalk file.
+    - find_locations_in_crosswalk: Find the primary_location_id for the given locations based on the crosswalk file.
+
+"""
+
+import logging
+from pathlib import Path
+from typing import List, Optional
+
+import pandas as pd
+
+from .utils import read_data
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+__all__ = [
+    "get_link_by_gage",
+    "get_link_id_from_file",
+    "get_locations_from_config_list",
+    "get_nwm_link_ids",
+    "find_locations_in_crosswalk",
+    "get_gage_by_link",
+    "get_gage_id_from_file",
+    "identify_locations",
+    "get_gage_ids",
+]
+
+
+def find_locations_in_crosswalk(
+    locations: list[str],
+    cwt: pd.DataFrame,
+) -> tuple[dict[str, str], list[str]]:
+    """Find the primary_location_id for the given locations based on the crosswalk file.
+
+    Args:
+        locations: A list of location IDs to find in the crosswalk.
+        cwt: A DataFrame containing the crosswalk data.
+
+    Returns:
+        A tuple containing:
+        - A dictionary mapping found location IDs to their primary_location_id.
+        - A list of location IDs that were not found in the crosswalk.
+
+    """
+
+    # Build a lookup dictionary from the crosswalk data for efficient searching
+    def build_location_lookup(cwt: pd.DataFrame) -> dict[str, str]:
+        lookup = {}
+
+        for primary_id in cwt["primary_location_id"].dropna().astype(str):
+            try:
+                _, location_id = primary_id.split("-", 1)
+            except ValueError:
+                logger.warning(f"Unexpected primary_location_id format: {primary_id}")
+                continue
+
+            if location_id in lookup:
+                logger.warning(
+                    f"Duplicate location id '{location_id}' found: "
+                    f"{lookup[location_id]} and {primary_id}"
+                )
+
+            lookup[location_id] = primary_id
+
+        return lookup
+
+    location_lookup = build_location_lookup(cwt)
+
+    found = {
+        loc: location_lookup[loc] for loc in locations if loc in location_lookup.keys()
+    }
+
+    missed = [loc for loc in locations if loc not in found.keys()]
+
+    return found, missed
+
+
+def get_link_by_gage(gages: List[str], crosswalk_file: str):
+    """Get location link ID based on gage ID and crosswalk file.
+
+    Args:
+        gages: A list of gage IDs.
+        crosswalk_file: Path to the crosswalk CSV file.
+
+    Returns:
+        A tuple containing:
+        - A list of gage IDs found in the crosswalk.
+        - A list of corresponding location link IDs.
+
+    """
+    cwt = read_data(crosswalk_file)
+
+    lookup, miss_ids = find_locations_in_crosswalk(
+        gages,
+        cwt,
+    )
+
+    cwt = cwt.set_index("primary_location_id")
+
+    gages1 = []
+    links1 = []
+
+    for gage, primary_location_id in lookup.items():
+        sec_id = cwt.at[primary_location_id, "secondary_location_id"]
+        links1.append(sec_id.split("-", 1)[1] if "-" in sec_id else sec_id)
+        gages1.append(gage)
+
+    return gages1, links1
+
+
+# get location gage ID based on link ID and crosswalk
+def get_gage_by_link(links: int, crosswalk_file: str):
+    """Get location gage ID (USGS gage ID) based on NWM link ID and crosswalk file.
+
+    Args:
+        links (list of int): List of NWM link IDs.
+        crosswalk_file (str): Path to the crosswalk file.
+
+    Returns:
+        list of str: List of corresponding USGS gage IDs.
+
+    """
+    cwt = read_data(crosswalk_file)
+    cwt.rename(columns={"primary_location_id": "gage"}, inplace=True)
+    cwt.rename(columns={"secondary_location_id": "link"}, inplace=True)
+
+    df = pd.DataFrame(list(map(lambda x: "nwm30-" + str(x), links)), columns=["link"])
+    df1 = df.merge(cwt, on="link", how="inner")
+    if len(df1) < len(df):
+        miss_ids = [x for x in df["link"].tolist() if x not in df1["link"].tolist()]
+        logger.info(
+            f"  Gage ID for links {miss_ids} are not found in crosswalk file {crosswalk_file}"
+        )
+    locations = [str(x[1]) for x in df1["gage"].str.split("-")]
+
+    return locations
+
+
+# get location link IDs (NWM feature or reach id) from locations in a file
+def get_link_id_from_file(
+    id_file: str,
+    nwm_ver: str,
+    crosswalk_file: Optional[str] = None,
+) -> list:
+    """Get location link IDs (NWM feature or reach id) from locations in a file.
+
+    Args:
+        id_file (str): Path to the file containing location IDs.
+        nwm_ver (str): NWM version (e.g., "nwm30").
+        crosswalk_file (str, optional): Path to the crosswalk file (optional).
+
+    Returns:
+        list: List of location link IDs.
+
+    """
+    f1 = Path(id_file).absolute()
+    if not f1.exists():
+        raise FileNotFoundError(f1)
+    df = read_data(f1)
+    df.columns = [x.lower() for x in df.columns]
+    locations = []
+    link1 = nwm_ver + "_link"
+    if link1 in df.columns:
+        locations = df[link1].tolist()
+    elif "gage" in df.columns:
+        crosswalk_file = Path(crosswalk_file).absolute()
+        if not crosswalk_file.exists():
+            raise FileNotFoundError(crosswalk_file)
+        locations = get_link_by_gage(df["gage"].tolist(), crosswalk_file)
+    else:
+        raise Exception(f'No "gage" or "{link1}" column found in {id_file}')
+
+    return locations
+
+
+def get_locations_from_config_list(
+    conf: dict, id_type: str, nwm_ver: Optional[str] = None
+) -> list:
+    """Get list of locations as either "gage" or "link" based on location_list provided in config file.
+
+    Args:
+        conf (dict): Dictionary defining the configurations (e.g., config.yaml).
+        id_type (str): Type of location ID to retrieve ("gage" or "link").
+        nwm_ver (str, optional): NWM version (e.g., "nwm30").
+
+    Returns:
+        list: List of location IDs.
+
+    """
+    locations = []
+    loc_list = conf["general"]["location_list"]
+    loc_type = conf["general"]["location_type"]
+    crosswalk_file = conf["file_paths"]["crosswalk_file"]
+    if loc_list is not None and loc_type is None:
+        raise ValueError(
+            "config general section: location_type must be provided when location_list is not empty"
+        )
+    else:
+        if loc_type in [x + "_link" for x in list(set(conf["general"]["nwm_version"]))]:
+            ver1 = loc_type.split("_")[0]
+            if ver1 not in crosswalk_file.keys():
+                raise ValueError(f"Crosswalk file is not found for {ver1}")
+            else:
+                if id_type == "gage":
+                    locations = get_gage_by_link(loc_list, crosswalk_file[ver1])
+                elif id_type == "link":
+                    locations = loc_list.copy()
+                else:
+                    raise ValueError(f"location type {id_type} not supported")
+        elif loc_type == "usgs_gage":
+            if id_type == "gage":
+                locations = loc_list.copy()
+            elif id_type == "link":
+                locations = get_link_by_gage(loc_list, crosswalk_file[nwm_ver])
+            else:
+                raise ValueError(f"location type {id_type} not supported")
+        else:
+            raise ValueError(
+                f'location_type must be either "usgs_gage" or "nwm30_link" or "nwm22_link'
+            )
+
+    return locations
+
+
+def get_nwm_link_ids(conf: dict, nwm_ver: str) -> list:
+    """Get NWM link IDs for the locations defined in the config file based on the provided crosswalk file.
+
+    Args:
+        conf (dict): Dictionary defining the configurations (e.g., config.yaml).
+        nwm_ver (str): NWM version (e.g., "nwm30").
+
+    Returns:
+        list: List of NWM link IDs.
+
+    """
+    location_list = conf["general"]["location_list"]
+    location_list_file = conf["file_paths"]["location_list_file"]
+    crosswalk_file = conf["file_paths"]["crosswalk_file"]
+
+    locations = []
+    if location_list is not None:
+        locations = get_locations_from_config_list(conf, "link", nwm_ver)
+    elif location_list_file is not None:
+        location_list_file = Path(location_list_file).absolute()
+        if not location_list_file.exists():
+            raise FileNotFoundError(location_list_file)
+        if nwm_ver in crosswalk_file.keys() and crosswalk_file[nwm_ver] is not None:
+            cwf = Path(crosswalk_file[nwm_ver]).absolute()
+            if not cwf.exists():
+                raise FileNotFoundError(cwf)
+            locations = get_link_id_from_file(location_list_file, nwm_ver, cwf)
+        else:
+            raise ValueError(f"Crosswalk file for {nwm_ver} is not provided")
+    else:
+        raise ValueError(
+            "Either location_list or location_list_file must be provided in configuration yaml file"
+        )
+
+    logger.info(f"  Total number of nwm locations: {len(locations)}")
+
+    return locations
+
+
+def get_gage_id_from_file(
+    id_file: str,
+    crosswalk_file: Optional[dict] = None,
+) -> list:
+    """Get location gage ID (USGS gage ID) from a file based on the provided crosswalk file.
+
+    Args:
+        id_file (str): Path to the file containing location IDs.
+        crosswalk_file (dict, optional): Dictionary containing paths to crosswalk files for different NWM versions (optional).
+
+    Returns:
+        list: List of USGS gage IDs.
+
+    """
+    f1 = Path(id_file).absolute()
+    if not f1.exists():
+        raise FileNotFoundError(f1)
+    df = read_data(f1, dtype={"gage": str, "primary_location_id": str})
+    df.columns = [x.lower() for x in df.columns]
+    locations = []
+    if "primary_location_id" in df.columns:
+        locations = df["primary_location_id"].tolist()
+    elif "gage" in df.columns:
+        locations = df["gage"].tolist()
+    else:
+        # check for link columns
+        cols = [c1 for c1 in df.columns if "link" in c1]
+        if len(cols) > 0:
+            for c1 in cols:
+                ver1 = c1.split("_")[0]
+                if ver1 in crosswalk_file.keys() and crosswalk_file[ver1] is not None:
+                    cwf = Path(crosswalk_file[ver1])
+                    if cwf.exists():
+                        locations = get_gage_by_link(df[c1].tolist(), cwf)
+                        break
+                    else:
+                        logger.info(f"crosswalk file not found: {cwf}")
+        else:
+            raise ValueError(
+                "No primary_location_id or NWM link column (e.g., nwmv30_link) is not found in location file"
+            )
+
+    return locations
+
+
+def get_gage_ids(conf: dict) -> list:
+    """Get gage IDs for the locations defined in the config file based on the provided crosswalk file.
+
+    Args:
+        conf (dict): Dictionary defining the configurations (e.g., config.yaml).
+
+    Returns:
+        list: List of gage IDs.
+
+    """
+    location_list = conf["general"]["location_list"]
+    location_list_file = conf["file_paths"]["location_list_file"]
+    crosswalk_file = conf["file_paths"]["crosswalk_file"]
+
+    locations = []
+    if location_list is not None:
+        locations = get_locations_from_config_list(conf, "gage")
+    elif location_list_file is not None:
+        location_list_file = Path(location_list_file).absolute()
+        locations = get_gage_id_from_file(location_list_file, crosswalk_file)
+    else:
+        # retrieve all gage IDs from crosswalk file
+        crosswalk_path = next(iter(crosswalk_file.values()))
+        df = read_data(crosswalk_path)
+        logger.info(
+            "  No location_list nor location_list_file is provided in the config file. "
+            "Retrieving all gage IDs from the crosswalk file..."
+        )
+
+        # filter based on location filter in config
+        location_filter = conf["general"].get("location_filter", None)
+        if location_filter is not None:
+            columns = location_filter["columns"]
+            values = location_filter["values"]
+
+            # Validate and normalize column names (case-insensitive match allowed)
+            available_columns = list(df.columns)
+            lower_to_actual = {c.lower(): c for c in available_columns}
+            normalized_columns: List[str] = []
+            for column in columns:
+                if column in available_columns:
+                    normalized_columns.append(column)
+                else:
+                    col_lower = column.lower()
+                    if col_lower in lower_to_actual:
+                        actual = lower_to_actual[col_lower]
+                        logger.warning(
+                            f"location_filter column '{column}' not found with exact case; "
+                            f"using '{actual}' instead based on case-insensitive match."
+                        )
+                        normalized_columns.append(actual)
+                    else:
+                        msg = (
+                            f"location_filter column '{column}' not found in crosswalk data. "
+                            f"Available columns are: {', '.join(sorted(available_columns))}"
+                        )
+                        logger.error(msg)
+                        raise ValueError(msg)
+
+            # Apply filters
+            for column, value in zip(normalized_columns, values):
+                df = df[df[column] == value]
+
+            # Logging all filters applied
+            filters_applied = ", ".join(
+                f"{col}={val}" for col, val in zip(normalized_columns, values)
+            )
+            logger.info(
+                f"  {len(df)} gages selected using location filter: {filters_applied}."
+            )
+        else:
+            logger.info(
+                f"  All {len(df)} gages from the crosswalk file are selected without applying any location filter."
+            )
+        locations = df["primary_location_id"].tolist()
+        locations = [x.split("-")[1] for x in locations]
+
+    cwt = read_data(crosswalk_file[list(crosswalk_file.keys())[0]])
+    found, _ = find_locations_in_crosswalk(
+        locations,
+        cwt,
+    )
+    gages = list(found.keys())
+
+    return gages
+
+
+def identify_locations(conf: dict) -> dict:
+    """Identify location IDs based on the provided crosswalk file.
+
+    Args:
+        conf: Dictionary defining the configurations (e.g., config.yaml).
+
+    Returns:
+        Dictionary containing primary and secondary location IDs for each dataset.
+
+    """
+    # get USGS gage ID for verification locations
+    locations_usgs = get_gage_ids(conf)
+
+    locations = {}
+    for dataset_idx, dataset in enumerate(conf["general"]["dataset_name"]):
+        # get NWM link ID based on USGS gage ID
+        nwm_version = conf["general"]["nwm_version"][dataset_idx]
+        locations_usgs1, locations_nwm1 = get_link_by_gage(
+            locations_usgs, conf["file_paths"]["crosswalk_file"][nwm_version]
+        )
+        logger.info(f"  Total number of locations for {dataset}: {len(locations_nwm1)}")
+
+        if len(locations_nwm1) > 1 and conf["nwm_forecast"]["data_source"] in [
+            "ngencerf",
+            "hindcast",
+        ]:
+            logger.warning(
+                f"  More than one location is found for dataset {dataset} based on the provided location_list "
+                f"{conf['general']['location_list']} and crosswalk file {conf['file_paths']['crosswalk_file'][nwm_version]}. "
+                f"Only the first location will be used for verification of this dataset."
+            )
+            locations_nwm1 = locations_nwm1[:1]
+            locations_usgs1 = locations_usgs1[:1]
+
+        if len(locations_usgs1) == 0 or len(locations_nwm1) == 0:
+            msg = (
+                f"  No gage ID is found for dataset {dataset} based on the provided location_list "
+                f"{conf['general']['location_list']} and crosswalk file {conf['file_paths']['crosswalk_file'][nwm_version]}."
+            )
+            logger.error(msg)
+            raise ValueError(msg)
+
+        locations[dataset] = {"primary": locations_usgs1, "secondary": locations_nwm1}
+
+    return locations

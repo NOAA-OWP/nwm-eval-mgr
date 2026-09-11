@@ -1,0 +1,317 @@
+name: CI/CD Pipeline
+
+on:
+  pull_request:
+    branches:
+      - ngwpc-candidate
+      - ngwpc-release
+      - main
+      - nwm-main
+      - development
+      - development-pw
+      - release-candidate
+  push:
+    branches:
+      - ngwpc-candidate
+      - ngwpc-release
+      - main
+      - nwm-main
+      - development
+      - development-pw
+      - release-candidate
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+env:
+  REGISTRY: ghcr.io
+  PYTHON_VERSION: '3.10.14'
+
+jobs:
+  # set variables to use in other jobs
+  setup:
+    name: setup
+    runs-on: ubuntu-latest
+    outputs:
+      org: ${{ steps.vars.outputs.org }}
+      image_base: ${{ steps.vars.outputs.image_base }}
+      pr_tag: ${{ steps.vars.outputs.pr_tag }}
+      commit_sha: ${{ steps.vars.outputs.commit_sha }}
+      commit_sha_short: ${{ steps.vars.outputs.commit_sha_short }}
+      test_image_tag: ${{ steps.vars.outputs.test_image_tag }}
+      alias_tag: ${{ steps.vars.outputs.alias_tag }}
+      build_date: ${{ steps.vars.outputs.build_date }}
+      clean_ref: ${{ steps.vars.outputs.clean_ref }}
+    steps:
+      - name: Compute image vars
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # set variables to use with Docker images
+          ORG="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          REPO="$(basename "${GITHUB_REPOSITORY}")"
+          IMAGE_BASE="${REGISTRY}/${ORG}/${REPO}"
+
+          # one datetime for all time variables
+          NOW=$(date -u +'%Y-%m-%d %H:%M:%S')
+
+          # for OCI labels
+          BUILD_DATE=$(date -u -d "$NOW" +'%Y-%m-%dT%H:%M:%SZ')
+
+          # for Docker image tags
+          TIMESTAMP=$(date -u -d "$NOW" +'%Y%m%d%H%M%SZ')
+
+          # logic to get the real branch name and commit SHA on pull requests
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            REAL_REF="${{ github.head_ref }}"
+            REAL_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            REAL_REF="${{ github.ref_name }}"
+            REAL_SHA="${GITHUB_SHA}"
+          fi
+
+          # clean ref name and short commit sha
+          CLEAN_REF=$(echo "$REAL_REF" | tr '[:upper:]' '[:lower:]' | sed 's/\//-/g')
+          SHORT_SHA="${REAL_SHA:0:7}"
+
+          # logic for the tags:
+          # test_image_tag (commit short sha): used for the initial build and test
+          # alias_tag: used for final tagging on successful tests
+
+          # test tag is always commit short sha
+          TEST_TAG="${SHORT_SHA}"
+
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # for pull requests, use pr-<pr number>-build
+            ALIAS="pr-${{ github.event.pull_request.number }}-build"
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "${{ github.ref_type }}" = "tag" ]; then
+            # for manual workflow dispatch on tags, use the git tag
+            ALIAS="${CLEAN_REF}"
+          else
+            # for pushes to branches, use timestamp-branchname
+            ALIAS="${TIMESTAMP}-${CLEAN_REF}"
+          fi
+
+          # save outputs
+          echo "org=${ORG}" >> "$GITHUB_OUTPUT"
+          echo "image_base=${IMAGE_BASE}" >> "$GITHUB_OUTPUT"
+          echo "build_date=${BUILD_DATE}" >> "$GITHUB_OUTPUT"
+          echo "test_image_tag=${TEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "alias_tag=${ALIAS}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=${REAL_SHA}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha_short=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "clean_ref=${CLEAN_REF}" >> "$GITHUB_OUTPUT"
+
+  # build nwm-eval-mgr Docker image
+  build:
+    name: build
+    if: |
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - uses: actions/checkout@v6
+      - name: Log in to registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ needs.setup.outputs.image_base }}:${{ needs.setup.outputs.test_image_tag }}
+          build-args: |
+            IMAGE_SOURCE=https://github.com/${{ github.repository }}
+            IMAGE_VENDOR=${{ github.repository_owner }}
+            IMAGE_VERSION=${{ needs.setup.outputs.clean_ref }}
+            IMAGE_REVISION=${{ needs.setup.outputs.commit_sha }}
+            IMAGE_CREATED=${{ needs.setup.outputs.build_date }}
+
+  # run unit tests inside the Docker image
+  unit-test:
+    name: unit-test
+    if: |
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+      - build
+    container:
+      image: ${{ needs.setup.outputs.image_base }}:${{ needs.setup.outputs.test_image_tag }}
+    steps:
+      - name: Run unit tests
+        run: |
+          echo "TODO: add unit tests here"
+
+  # run container security scan using Trivy
+  container-scanning:
+    name: container-scanning
+    if: |
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+      - build
+    steps:
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@v0.2.6
+        with:
+          cache: true
+          version: v0.69.3
+
+      - name: Trivy scan
+        env:
+          TMPDIR: /mnt/trivy-temp
+        run: |
+          sudo mkdir -p $TMPDIR
+          sudo chown -R $USER:$USER $TMPDIR
+
+          trivy image \
+            --format sarif \
+            --output trivy-results.sarif \
+            --severity CRITICAL,HIGH \
+            --scanners vuln \
+            --ignore-unfixed \
+            --timeout 45m \
+            ${{ needs.setup.outputs.image_base }}:${{ needs.setup.outputs.test_image_tag }}
+
+  # promote image tag after successful tests
+  promote-tags:
+    name: Promote Tags
+    if: |
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+      - build
+      - unit-test
+      - container-scanning
+    steps:
+      - name: Tag image with alias and latest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # ensure skopeo is available for promotion
+          if ! command -v skopeo >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y --no-install-recommends skopeo
+          fi
+
+          IMAGE_BASE="${{ needs.setup.outputs.image_base }}"
+          TEST_TAG="${{ needs.setup.outputs.test_image_tag }}"
+          ALIAS_TAG="${{ needs.setup.outputs.alias_tag }}"
+
+          # apply the primary alias (pr tag or timestamp-branch)
+          skopeo copy \
+            --src-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            --all \
+            "docker://${IMAGE_BASE}:${TEST_TAG}" "docker://${IMAGE_BASE}:${ALIAS_TAG}"
+
+          # Branch-keyed promotion: development promotes 'latest' (AWS lane);
+          # development-pw promotes 'latest-pw' (PW lane). Do not manually
+          # dispatch a cross-lane build from either branch: promotion keys off
+          # the branch name, so the tested image would promote under the wrong
+          # alias.
+          if [ "$GITHUB_REF_NAME" = "development" ]; then
+            skopeo copy \
+              --src-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+              --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+              --all \
+              "docker://${IMAGE_BASE}:${TEST_TAG}" "docker://${IMAGE_BASE}:latest"
+          elif [ "$GITHUB_REF_NAME" = "development-pw" ]; then
+            skopeo copy \
+              --src-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+              --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+              --all \
+              "docker://${IMAGE_BASE}:${TEST_TAG}" "docker://${IMAGE_BASE}:latest-pw"
+          fi
+
+  # Build the Apptainer .sif from the tested + promoted image and publish it to
+  # GHCR as an OCI artifact (oras://). AWS PCS compute nodes pull this onto the
+  # shared EFS and run it with `apptainer run`. SIF images are NOT baked into the
+  # compute AMI (the AMI carries only the Apptainer runtime); the images ship here
+  # and are staged on EFS.
+  build-sif:
+    name: build-sif
+    # Only on real branch builds (push) or manual dispatch, not PRs (a multi-GB
+    # SIF build on every PR is wasteful). Runs after the image is tested + promoted.
+    if: |
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+      - promote-tags
+    env:
+      # Keep Apptainer's build temp + layer cache off the small root volume; /mnt
+      # is the roomy ephemeral disk on GitHub-hosted runners (a SIF needs room for
+      # the uncompressed image during mksquashfs).
+      APPTAINER_TMPDIR: /mnt/apptainer-tmp
+      APPTAINER_CACHEDIR: /mnt/apptainer-cache
+    steps:
+      - name: Install Apptainer
+        uses: eWaterCycle/setup-apptainer@v2
+        with:
+          apptainer-version: 1.3.6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build .sif from the promoted image and push to GHCR (oras)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p "$APPTAINER_TMPDIR" "$APPTAINER_CACHEDIR"
+          sudo chown -R "$USER":"$USER" "$APPTAINER_TMPDIR" "$APPTAINER_CACHEDIR"
+
+          IMAGE_BASE="${{ needs.setup.outputs.image_base }}"   # ghcr.io/<org>/nwm-eval-mgr
+          ALIAS_TAG="${{ needs.setup.outputs.alias_tag }}"     # the tested + promoted tag
+          SIF_REPO="${IMAGE_BASE}-sif"                         # ghcr.io/<org>/nwm-eval-mgr-sif
+
+          # Convert the promoted OCI image to a SIF. docker/login-action wrote
+          # ~/.docker/config.json, which Apptainer reads for the docker:// pull and
+          # the oras:// push. Unprivileged build uses --fakeroot automatically
+          # (GitHub-hosted runners have unprivileged user namespaces enabled).
+          apptainer build --force nwm-eval-mgr.sif "docker://${IMAGE_BASE}:${ALIAS_TAG}"
+
+          # Publish as an OCI artifact. A SIF pushed via oras:// MUST be pulled via
+          # oras:// (not docker://). The in-VPC staging step pulls this onto EFS.
+          apptainer push nwm-eval-mgr.sif "oras://${SIF_REPO}:${ALIAS_TAG}"
+          echo "Published oras://${SIF_REPO}:${ALIAS_TAG}"
+
+          # Branch-keyed SIF promotion, mirroring the image promotion above:
+          # development also publishes ':latest', development-pw ':latest-pw'.
+          # The registry already holds the SIF blob from the push above, so this
+          # re-push uploads only the manifest and tag, not the multi-GB SIF. Do
+          # not manually dispatch a cross-lane build from either branch:
+          # promotion keys off the branch name, so the SIF would promote under
+          # the wrong alias.
+          if [ "$GITHUB_REF_NAME" = "development" ]; then
+            apptainer push nwm-eval-mgr.sif "oras://${SIF_REPO}:latest"
+            echo "Promoted oras://${SIF_REPO}:latest"
+          elif [ "$GITHUB_REF_NAME" = "development-pw" ]; then
+            apptainer push nwm-eval-mgr.sif "oras://${SIF_REPO}:latest-pw"
+            echo "Promoted oras://${SIF_REPO}:latest-pw"
+          fi

@@ -1,0 +1,12 @@
+sample_file_path|calib_basin_group1/joined/v3_oct.nwm30.short_range.joined.parquet
+title|Paired data for the short-range forecast (v3_oct.nwm30.short_range) in the calib_basin_group1 dataset, which includes the forecasted and observed values for each location and time step.
+primary_location_id|Primary location identifier (e.g., USGS gage ID).
+primary_value|Forecasted value for the primary location.
+secondary_location_id|Secondary location identifier (e.g., USGS gage ID).
+secondary_value|Observed value for the secondary location.
+value_time|Time of the forecasted and observed values.
+configuration|NWM configuration of the forecast.
+measurement_unit|Unit of the forecasted and observed values.
+variable_name|Name of the forecasted variable.
+reference_time|Reference time of the forecast.
+lead_time|Lead time of the forecast.

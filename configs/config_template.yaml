@@ -1,0 +1,105 @@
+general:     # General configuration for the evaluation, including dataset information and evaluation settings.
+  steps:     # Steps to run in the evaluation process.
+    fetch_fcst_data: True
+    fetch_obs_data: True
+    pair_data: True
+    compute_metrics: True
+    plot_metrics: True
+  domain: 'conus'     # Domain for the evaluation. Valid options are 'conus', 'hi', 'ak', 'prvi' (case insensitive).
+  assemble_domain: False     # Whether to assemble results across VPUs for the CONUS domain.
+  location_set_name: 'usgs_01123000'     # Name for the set of locations to evaluate.
+  location_list: ['01123000', '01123500']     # List of specific locations to include in the evaluation. If None, all locations in the crosswalk file will be used.
+  location_type: 'usgs_gage'     # Type of locations to evaluate, which determines how locations are identified and processed.
+  location_filter:     # Configuration for filtering locations based on column values.
+    columns: ['vpu_id', 'status']
+    values: ['03S', 'USGS-active']
+  location_group_size: 200     # Number of locations to process in each group when pairing forecast and observation data.
+  variable_name: 'streamflow'     # Name of the variable to evaluate. Currently only 'streamflow' is supported, but this field is included for future extensibility.
+  nwm_configuration: 'ngen'     # NWM configuration to evaluate.
+  dataset_name: ['noah_cfes', 'noah_topmodel']     # User-specified name(s) for the dataset(s) to evaluate.
+  nwm_version: ['ngen', 'nwm30']     # NWM version(s) to evaluate.
+  forecast_start_date: ['2022-12-01 00:00:00', '2022-12-15 00:00:00']     # Start date(s) for the forecast data to evaluate.
+  forecast_end_date: ['2022-12-31 00:00:00', '2023-01-15 00:00:00']     # End date(s) for the forecast data to evaluate.
+  eval_start_date: ['2022-12-11 00:00:00', '2022-12-25 00:00:00']     # Start date(s) for the evaluation period.
+  eval_end_date: ['2022-12-31 00:00:00', '2023-01-15 00:00:00']     # End date(s) for the evaluation period.
+  separate_calibrated: False     # Whether to distinguish calibrated and regionalized locations in the evaluation
+file_paths:     # Configuration for file paths used in the evaluation, including input data and output directories.
+  base_dir: '~/ngen_evaluation/'     # Root directory for storing data and outputs.
+  location_list_file: ~/location_list.csv     # Path to a file containing the list of locations to evaluate
+  crosswalk_file: ~/crosswalk.csv     # Path to a crosswalk file or a dictionary of crosswalk files.
+  fcst_config_file: 'data/inputs/nwm_forecast_configuration.yaml'     # Path to the forecast configuration file defining parameters for different NWM configurations.
+  fcst_data_file: '01123000_output.csv'     # Path to the forecast data file or a dictionary of forecast data files.
+  fcst_data_dir: 'data/inputs/hindcasts/'     # Path to the directory containing forecast data files or a dictionary of directories.
+  obs_data_file: 'data/inputs/obs/01123000_hourly_discharge.csv'     # Path to the observation data file. Both obs_data_file and obs_data_dir can be specified. The run will read all .csv and .parquet files in obs_data_dir and obs_data_file and remove duplicates.If neither obs_data_file nor obs_data_dir is provided, an observation data source must be specified in the 'flow_observation.usgs' section.
+  obs_data_dir: 'data/inputs/obs/'     # ("Path to the observation data directory where one or more observation data files are stored. The run will look for all .csv and .parquet files in this directory. Each file can contain observation data for a single location (with the filename starting with the location identifier), or multiple locations with a 'location_id' column specifying the location identifiers.",)
+  calib_param_file: 'data/inputs/calib_params.csv'     # Path to the calibration parameter file.
+  txdot_gage_file: 'data/inputs/gage_files/tx_gauges.csv'     # Path to the TxDOT gage file.
+  output_dir: 'ngen_evaluation/outputs/usgs_01123000/'     # Directory to save outputs such as paired data, computed metrics, and plots. 
+nwm_forecast:     # Configuration for NWM forecast data.
+  data_source: 'ngenCERF'     # Data source for the NWM forecast. Valid options include 'ngenCERF', 'ngenSIM', 'hindcast', and 'GCS'.
+  fetch_fcst: [True]     # Whether to fetch forecast data for each dataset, with local file existence check.
+  output_type: 'channel_rt'     # Type of NWM output to retrieve. Currently only 'channel_rt' is supported. Only applicable when data_source='GCS'. 
+  t_minus: [0, 1, 2]     # T-minus hours for which to retrieve NWM forecasts, only applicable for AnA runs on GCS.
+  kerchunk_method: 'local'     # Preference for creating Kerchunk reference json files, only applicable for GCS data source.
+  process_by_z_hour: True     # Whether to process NWM files by z-hour per day, only applicable for GCS data source.
+  stepsize: 100     # Number of files to process in memory at once when processing GCS data without z-hour chunking.
+  ignore_missing_file: True     # Whether to ignore missing NWM files and continue processing, only applicable for GCS data source.
+  overwrite_output: False     # Whether to overwrite existing forecast data files.
+  memory_per_worker_gb: 3     # Configurable memory (in GB) assigned to each worker or process.
+flow_observation:     # Configuration for flow observation data.
+  usgs: ''     # Configuration for USGS flow observations. If omitted, obs_data_file and/or obs_data_dir must be provided in file_paths section, 
+pair_data:     # Configuration for paired data.
+  overwrite: True     # Whether to overwrite existing paired data files.
+  group_size: 200     # Number of locations to process in each group when pairing forecast and observation data.
+metrics:     # Configuration for metrics.
+  lead_times: ['all', '1-5', '5-10', '10-15', 'all_aggregated']     # Lead times to include in the evaluation.
+  overwrite: True     # Whether to overwrite existing metric files. 
+  library: 'nwm.eval'     # Library to use for metric computation. Valid options: nwm.eval, teehr. 
+  metric_subset: 'all'     # Subset of metrics to compute, either 'all' or a list of metric names.
+  metric_exclude: ['HSEG_FDC', 'MSEG_FDC', 'LSEG_FDC']     # List of metric names to exclude from metric_subset for computation. 
+  threshold_categorical:     # Threshold for categorical metrics. Valid options for type are 'quantile' and 'absolute'. If 'quantile', the threshold will be determined as the specified quantile of the observed flow values. If 'absolute', the threshold will be the specified absolute flow value.
+    value: 0.9
+    type: quantile
+  threshold_event:     # Threshold for event-based metrics. Valid options for type are 'quantile' and 'absolute'. If 'quantile', the threshold will be determined as the specified quantile of the observed flow values. If 'absolute', the threshold will be the specified absolute flow value.
+    value: 0.9
+    type: quantile
+  file_format: 'parquet'     # File format for output files. Valid options are 'parquet' and 'csv'.
+plots:     # Configuration for plots.
+  histogram:     # Configuration for histogram plots.
+    lead_times: ['all', '1-5', '5-10', '10-15', 'all_aggregated']     # Lead times to include in the evaluation.
+    plot: False     # Whether to generate this type of plot.
+    metric_subset: ['NSE', 'KGE']     # List of metric names to include in the plots.
+    tag: ''     # Optional tag to include in plot titles and filenames.
+    binning:     # Dictionary specifying the binning for histogram plots, with metric names as keys and lists of bin edges as values.
+      NSE: [-1, -0.5, 0, 0.5, 1]
+      KGE: [-1, -0.5, 0, 0.5, 1]
+  boxplot:     # Configuration for box plot.
+    lead_times: ['all', '1-5', '5-10', '10-15', 'all_aggregated']     # Lead times to include in the evaluation.
+    plot: False     # Whether to generate this type of plot.
+    metric_subset: ['NSE', 'KGE']     # List of metric names to include in the plots.
+    tag: ''     # Optional tag to include in plot titles and filenames.
+    show_outliers: False     # Whether to show outliers in box plots. If True, outliers will be shown as individual points. If False, outliers will be omitted.
+  spatial_map:     # Configuration for spatial map plots.
+    lead_times: ['all', '1-5', '5-10', '10-15', 'all_aggregated']     # Lead times to include in the evaluation.
+    plot: False     # Whether to generate this type of plot.
+    metric_subset: ['NSE', 'KGE']     # List of metric names to include in the plots.
+    tag: ''     # Optional tag to include in plot titles and filenames.
+    scaling:     # Dictionary specifying the scaling for spatial maps, with metric names as keys and lists of scaling ranges as values.
+      NSE: [-0.5, 1.0]
+      KGE: [-0.5, 1.0]
+  time_series:     # Configuration for time series plots.
+    reference_times: ['2022-12-01 00:00:00', '2022-12-15 00:00:00']     # Reference times (T0s) to include in the evaluation.
+    lead_times: [1, 2, 3]     # List of lead times for time series plots. Each lead time should be a number representing the forecast lead time in hours.
+    plot: False     # Whether to generate this type of plot.
+    metric_subset: ['NSE', 'KGE']     # List of metric names to include in the plots.
+    tag: ''     # Optional tag to include in plot titles and filenames.
+  metric_table:     # Configuration for metric table plots.
+    lead_times: ['all', '1-5', '5-10', '10-15', 'all_aggregated']     # Lead times to include in the evaluation.
+    plot: False     # Whether to generate this type of plot.
+    metric_subset: ['NSE', 'KGE']     # List of metric names to include in the plots.
+    tag: ''     # Optional tag to include in plot titles and filenames.
+  barchart:     # Configuration for bar chart plots.
+    lead_times: ['all', '1-5', '5-10', '10-15', 'all_aggregated']     # Lead times to include in the evaluation.
+    plot: False     # Whether to generate this type of plot.
+    metric_subset: ['NSE', 'KGE']     # List of metric names to include in the plots.
+    tag: ''     # Optional tag to include in plot titles and filenames.

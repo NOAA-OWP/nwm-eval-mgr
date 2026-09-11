@@ -1,0 +1,19 @@
+sample_file_path|calib_basin_group1/metrics/v3_oct.nwm30.short_range.metrics.parquet
+title|Metrics computed for a given NWM dataset (here defined by forecast time period, NWM version and configuration, e.g., v3_oct.nwm30.short_range)
+CORR|Correlation coefficient between forecasted and observed values.
+NSE|Nash-Sutcliffe Efficiency coefficient between forecasted and observed values.
+NSElog|Nash-Sutcliffe Efficiency coefficient computed on the logarithm of forecasted and observed values.
+NSEwt|Weighted score of NSE and NSElog.
+KGE|Kling-Gupta Efficiency coefficient between forecasted and observed values.
+MAE|Mean Absolute Error between forecasted and observed values.
+RMSE|Root Mean Square Error between forecasted and observed values.
+PBIAS|Percent Bias between forecasted and observed values.
+RSR|Ratio of the RMSE to the standard deviation of observed values.
+HSEG_FDC|Flow Duration Curve error metric for the highflow segment.
+MSEG_FDC|Flow Duration Curve error metric for the middle segment.
+LSEG_FDC|Flow Duration Curve error metric for the lowflow segment.
+POD|Probability of Detection.
+FAR|False Alarm Ratio.
+CSI|Critical Success Index.
+lead_group|Lead time group.
+primary_location_id|Primary location identifier (e.g., USGS gage ID).

@@ -1,0 +1,49 @@
+usgs_01123000_hindcast/
+├── joined/
+│   ├── noah_cfes.ngen.short_range.joined.parquet
+│   ├── noah_sac.ngen.short_range.joined.parquet
+├── metrics/
+│   ├── noah_cfes.ngen.short_range.metrics.csv
+│   ├── noah_cfes.ngen.short_range.metrics.parquet
+│   ├── noah_sac.ngen.short_range.metrics.csv
+│   ├── noah_sac.ngen.short_range.metrics.parquet
+├── noah_cfes/
+│   ├── short_range/
+│   │   ├── 20250820T00.parquet
+│   │   ├── 20250820T06.parquet
+│   │   ├── 20250820T12.parquet
+│   │   ├── 20250820T18.parquet
+│   │   ├── 20250821T00.parquet
+│   │   └── ... (5 more files)
+├── noah_sac/
+│   ├── short_range/
+│   │   ├── 20250820T00.parquet
+│   │   ├── 20250820T06.parquet
+│   │   ├── 20250820T12.parquet
+│   │   ├── 20250820T18.parquet
+│   │   ├── 20250821T00.parquet
+│   │   └── ... (5 more files)
+├── plots/
+│   ├── short_range/
+│   │   ├── barchart/
+│   │   │   ├── barchart_CORR_01123000.png
+│   │   │   ├── barchart_KGE_01123000.png
+│   │   │   ├── barchart_NNSE_01123000.png
+│   │   │   ├── barchart_NSE_01123000.png
+│   │   │   ├── barchart_PBIAS_01123000.png
+│   │   ├── metric_table/
+│   │   │   ├── metric_table_lead_h1-18_01123000.png
+│   │   │   ├── metric_table_lead_h1-5_01123000.png
+│   │   │   ├── metric_table_lead_h10_01123000.png
+│   │   │   ├── metric_table_lead_h1_01123000.png
+│   │   ├── time_series/
+│   │   │   ├── time_series_T0_20250820T00.png
+│   │   │   ├── time_series_T0_20250821T00.png
+│   │   │   ├── time_series_T0_20250822T00.png
+│   │   │   ├── time_series_lead_h1.png
+│   │   │   ├── time_series_lead_h12.png
+│   │   │   └── ... (2 more files)
+├── usgs/
+│   ├── 2025-08-20_2025-08-24.parquet
+├── nwm_verf_config_expanded.yaml
+├── verification.log

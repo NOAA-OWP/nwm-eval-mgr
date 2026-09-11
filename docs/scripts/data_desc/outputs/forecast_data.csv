@@ -1,0 +1,9 @@
+sample_file_path|calib_basin_group1/v3_oct/short_range/20241001T00.parquet
+title|Raw forecast data for a given NWM dataset (here defined by forecast time period, NWM version and configuration, e.g., v3_oct.nwm30.short_range), which includes the forecasted values for all locations and time steps.
+value|Forecasted value for a specific location and time step.
+reference_time|Reference time of the forecast.
+location_id|Location identifier (e.g., NextGen hydrofabric feature ID).
+value_time|Time of the forecasted value.
+configuration|NWM configuration of the forecast.
+variable_name|Name of the forecasted variable.
+measurement_unit|Unit of the forecasted value.

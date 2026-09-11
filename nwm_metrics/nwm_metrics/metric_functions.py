@@ -1,9 +1,21 @@
-"""
-This module contains functions to process model output and compute statistical measures.
-@author: Xia Feng
+"""Module containing functions to calculate various metrics for evaluating hydrological model performance.
+
+Functions:
+    - treat_values: Preprocess time series data by removing negative values, NaN values, and replacing zero values.
+    - pearson_corr: Calculate Pearson correlation coefficient and p-value between observed and simulated values.
+    - mean_abs_error: Calculate mean absolute error between observed and simulated values.
+    - root_mean_squared_error: Calculate root mean squared error or mean squared error between observed and simulated values.
+    - rmse_std_ratio: Calculate the ratio of RMSE to the standard deviation of observed values.
+    - percent_bias: Calculate percent bias between observed and simulated values.
+    - nse: Calculate Nash-Sutcliffe efficiency, with options for logarithmic transformation and normalization.
+    - weighted_nse: Calculate a weighted average of NSE and logarithmic NSE.
+    - kge: Calculate Kling-Gupta efficiency between observed and simulated values.
+    - pbias_fdc: Calculate percent bias of flow duration curve segments (high, medium, low flow) based on exceedance probabilities.
+    - categorical_score: Calculate categorical scores (POD, FAR, CSI, FBIAS) based on a specified threshold.
+    - calculate_metrics: A wrapper function to calculate multiple metrics at once based on user-specified metric names.
+
 """
 
-import math
 import warnings
 from typing import Dict, Optional, Union
 
@@ -17,12 +29,7 @@ import scipy.stats as sp
 from hydrotools.metrics import metrics as hm
 from scipy.stats import pearsonr
 
-from .event_metric_functions import (
-    compute_event_metrics,
-    identify_events,
-    pair_events,
-    separate_compound_events,
-)
+from .event_metric_functions import event_based_metrics
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -32,12 +39,11 @@ __all__ = [
     "pearson_corr",
     "mean_abs_error",
     "root_mean_squared_error",
-    "MSE",
     "rmse_std_ratio",
     "percent_bias",
-    "NSE",
-    "Weighted_NSE",
-    "KGE",
+    "nse",
+    "weighted_nse",
+    "kge",
     "categorical_score",
     "pbias_fdc",
     "event_based_metrics",
@@ -49,27 +55,27 @@ def treat_values(
     remove_neg: Optional[bool] = False,
     remove_na: Optional[bool] = False,
     replace_zero: Optional[bool] = False,
+    replace_inf: Optional[bool] = False,
 ) -> pd.DataFrame:
     """Remove NaN, inf and negative values, and replace zero values of time series.
 
-    Parameters
-    ----------
-    df : Contains time series of observation and simulation
-    remove_neg : If True, when negative value occurs at the ith element of observation or simulation
-        the ith element of both observation or simulation is removed.
-    remove_nan : If True, when NaN value occurs at the ith element of observation or simulation,
-        the ith element of both observation or simulation is removed.
-    replace_zero : If True, when the zero value occurs at the ith element of observation or simulation,
-        all observation and simulation are added with 1/100 of mean of observation according to Pushpalatha et al (2012).
+    Args:
+        df (pd.DataFrame): Contains time series of observation and simulation.
+        remove_neg (bool, optional): If True, when negative value occurs at the ith element of observation or simulation
+            the ith element of both observation or simulation is removed.
+        remove_na (bool, optional): If True, when NaN value occurs at the ith element of observation or simulation,
+            the ith element of both observation or simulation is removed.
+        replace_zero (bool, optional): If True, when the zero value occurs at the ith element of observation or simulation,
+            all observation and simulation are added with 1/100 of mean of observation according to Pushpalatha et al (2012).
+        replace_inf (bool, optional): If True, when the inf value occurs at the ith element of observation or simulation,
+            the ith element of both observation or simulation is replaced with a large finite value.
 
-    Returns
-    -------
-    df : Ouput DataFrame
+    Returns:
+        pd.DataFrame: New DataFrame with treated values
 
-    References
-    ----------
-    Pushpalatha, R., C. Perrin, N. L. Moine, V. Andreassian, 2012: A review of efficiency criteria suitable
-        for evaluating low-flow simulations. Journal of Hydrology, 420-421, 171-182.
+    References:
+        Pushpalatha, R., C. Perrin, N. L. Moine, V. Andreassian, 2012: A review of efficiency criteria suitable
+            for evaluating low-flow simulations. Journal of Hydrology, 420-421, 171-182.
 
     """
     df = df.copy()
@@ -93,10 +99,15 @@ def treat_values(
     # Replace zero values
     if replace_zero:
         if df[colnames[1:]].min().values.min() <= 0.0001:
-            df[colnames[1:]] = (
-                df[colnames[1:]] + 1.0 / 100.0 * df[colnames[1]].mean()
-            )  # this treatment does not work when mean is zero
-            # df[colnames[1:]] = df[colnames[1:]] + 0.00001
+            # df[colnames[1:]] = (
+            #     df[colnames[1:]] + 1.0 / 100.0 * df[colnames[1]].mean()
+            # )  # this treatment does not work when mean is zero
+            df[colnames[1:]] = df[colnames[1:]] + 0.00001
+
+    # Remove inf values
+    if replace_inf:
+        inf_index = df.isin([np.inf, -np.inf])
+        df[inf_index] = np.nan
 
     return df
 
@@ -107,18 +118,16 @@ def pearson_corr(
 ) -> float:
     """Compute mean squared error, or optionally root mean squared error.
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
 
-    Returns
-    -------
-    corr : float
-    p_value : float
+    Returns:
+        corr (float): Pearson correlation coefficient
+        p_value (float): Two-tailed p-value
+
 
     """
-
     # Compute
     corr, p_value = pearsonr(y_pred, y_true)
 
@@ -131,16 +140,14 @@ def mean_abs_error(
 ) -> float:
     """Compute mean absolute error between simulation and observation.
 
-    Parameters
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
 
-    Returns
-    -------
-    Mean absolute error
+    Returns:
+        float: Mean absolute error
 
     """
-
     return np.nanmean(np.abs(y_pred - y_true))  # this handles NaN values appropriately
 
 
@@ -151,53 +158,51 @@ def root_mean_squared_error(
 ) -> float:
     """Compute root mean squared error, or optionally mean squared error.
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
-    root :  When False, return the mean squared error.
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
+        root (bool, optional): When False, return the mean squared error.
 
-    Returns
-    -------
-    Root mean squared error or mean squared error
+    Returns:
+        float: Root mean squared error or mean squared error
 
     """
-
     # Compute mean squared error
-    MSE = np.nanmean((y_true - y_pred) ** 2.0)  # this handles NaN values appropriately
+    mse = np.nanmean((y_true - y_pred) ** 2.0)  # this handles NaN values appropriately
 
     # Return RMSE, optionally return mean squared error
     if not root:
-        return MSE
-    return np.sqrt(MSE)
+        return mse
+    return np.sqrt(mse)
 
 
 def rmse_std_ratio(
     y_true: pd.Series,
     y_pred: pd.Series,
     root: Optional[bool] = False,
+    warning_msg: Optional[bool] = False,
 ) -> float:
     """Compute ratio of RMSE between simulation and observation to standard deviation of observation.
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
+        root (bool, optional): When True, compute RMSE for the numerator; when False, compute MSE for the numerator.
+        warning_msg (bool, optional): When True, display a warning message if the denominator is zero.
 
-    Returns
-    -------
-    rsr: ratio of RMSE and standard deviation of observation
+    Returns:
+        float: Ratio of RMSE and standard deviation of observation
 
     """
-
-    rmse = root_mean_squared_error(y_true, y_pred, root=True)
+    rmse = root_mean_squared_error(y_true, y_pred, root=root)
     denominator = np.std(y_true)
 
     if denominator != 0:
         rsr = rmse / denominator
     else:
         rsr = np.nan
-        warnings.warn("'np.std(y_true) = 0', can't compute RSR")
+        if warning_msg:
+            logger.warning("'np.std(y_true) = 0', can't compute RSR")
 
     return rsr
 
@@ -205,58 +210,55 @@ def rmse_std_ratio(
 def percent_bias(
     y_true: pd.Series,
     y_pred: pd.Series,
+    warning_msg: Optional[bool] = False,
 ) -> float:
     """Compute mean squared error, or optionally root mean squared error.
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
+        warning_msg (bool, optional): When True, display a warning message if the denominator is zero.
 
-    Returns
-    -------
-    pbias : float
+    Returns:
+        float: Percent bias
 
     """
-
-    # compute
     denominator = np.sum(y_true)
     pbias = np.sum(np.subtract(y_pred, y_true)) / denominator * 100
 
     if denominator != 0:
         return pbias
     else:
+        if warning_msg:
+            logger.warning("'np.sum(y_true) = 0', can't compute PBIAS")
         return np.nan
-        warnings.warn("'np.sum(y_true) = 0', can't compute PBIAS")
 
 
-def NSE(
+def nse(
     y_true: pd.Series,
     y_pred: pd.Series,
     fun: Optional[str] = None,
     epsilon: Union[None, str] = [None, "Pushpalatha2012"],
     normalized: Optional[bool] = False,
+    warning_msg: Optional[bool] = False,
 ) -> float:
     """Compute Nash-Sutcliffe efficiency.
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
-    fun: Transformation function applied to y_true and y_pred
-    epsilon: Value added to both y_true and y_pred if fun is logarithm or other functions
-        that are mathematically impossible to compute transformation of zero flows:
-        1) 0: zero value
-        2) "Pushpalatha2012": 1/100 of mean of y_true
-        3) other numeric value
-    normalized : If True, convert Nash-Sutcliffe efficiency to the normalized value.
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
+        fun (str, optional): Transformation function applied to y_true and y_pred
+        epsilon (Union[None, str], optional): Value added to both y_true and y_pred if fun is logarithm or other functions
+            that are mathematically impossible to compute transformation of zero flows:
+            1) 0: zero value
+            2) "Pushpalatha2012": 1/100 of mean of y_true
+            3) other numeric value
+        normalized (bool, optional): If True, convert Nash-Sutcliffe efficiency to the normalized value.
 
-    Returns
-    ----------
-    Nash-Sutcliffe Efficiency value
+    Returns:
+        float: Nash-Sutcliffe Efficiency value
 
     """
-
     # Transform values
     if fun == "log":
         if epsilon == "Pushpalatha2012":
@@ -279,47 +281,43 @@ def NSE(
             return 1.0 / (1.0 + numerator / denominator)
         return 1.0 - numerator / denominator
     else:
+        if warning_msg:
+            logger.warning("'denominator = 0', can't compute NSE")
         return np.nan
-        warnings.warn("'denominator = 0', can't compute NSE")
 
 
-def Weighted_NSE(
+def weighted_nse(
     y_true: pd.Series,
     y_pred: pd.Series,
     weight: Optional[float] = 0.5,
     normalized: Optional[bool] = False,
 ) -> float:
-    """Compute weighted average of Nash-Sutcliffe efficiency of raw time series and
-    Nash-Sutcliffe efficiency of logrithmic time series.
+    """Compute weighted average of NSE of raw time series and NSE of logrithmic time series.
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
-    weight : weight value for Nash-Sutcliffe efficiency component
-    normalized : Whether to convert the weighted Nash-Sutcliffe efficiency to the normalized valu
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
+        weight (float, optional): Weight value for Nash-Sutcliffe efficiency component
+        normalized (bool, optional): Whether to convert the weighted Nash-Sutcliffe efficiency to the normalized value
 
-    Returns
-    ----------
-    Weighted Nash-Sutcliffe Efficiency value
+    Returns:
+        float: Weighted Nash-Sutcliffe Efficiency value
 
     """
-
-    # Compute NSE
-    nse = NSE(y_true, y_pred)
+    nse1 = nse(y_true, y_pred)
 
     # Compute NSELog
-    nselog = NSE(y_true, y_pred, fun="log", epsilon="Pushpalatha2012")
+    nselog = nse(y_true, y_pred, fun="log", epsilon="Pushpalatha2012")
 
     # Compute weighted NSE
-    nsewt = nse * weight + nselog * (1 - weight)
+    nsewt = nse1 * weight + nselog * (1 - weight)
 
     if normalized:
         return 1.0 / (2.0 - nsewt)
     return nsewt
 
 
-def KGE(
+def kge(
     y_true: pd.Series,
     y_pred: pd.Series,
     r_scale: Optional[float] = 1.0,
@@ -328,21 +326,18 @@ def KGE(
 ) -> float:
     """Compute Kling-Gupta efficiency between simulation and observation.
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
-    r_scale : correlation scaling factor
-    a_scale : relative variability scaling factor
-    b_scale : relative mean scaling factor
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
+        r_scale (float, optional): correlation scaling factor (default is 1.0)
+        a_scale (float, optional): relative variability scaling factor (default is 1.0)
+        b_scale (float, optional): relative mean scaling factor (default is 1.0)
 
-    Returns
-    ----------
-    Kling-Gupta efficiency value
+    Returns:
+        float: Kling-Gupta efficiency value
 
-    References
-    ----------
-    Gupta, H. V., Kling, H., Yilmaz, K. K., & Martinez, G. F. (2009). Decomposition of the mean
+    References:
+        Gupta, H. V., Kling, H., Yilmaz, K. K., & Martinez, G. F. (2009). Decomposition of the mean
         squared error and NSE performance criteria: Implications for improving hydrological modelling.
         Journal of hydrology, 377(1-2), 80-91.
 
@@ -384,31 +379,26 @@ def pbias_fdc(
     pqthr: Optional[float] = 0.1,
     warning_msg: Optional[bool] = False,
 ) -> Dict[str, float]:
-    """Compute percent bias of flow duration curve (FDC) high-segment volume,
-    midsegment slope and low-segment volume according to Yilmaz et al (2008).
+    """Compute percent bias of flow duration curve (FDC) high-segment volume, midsegment slope and low-segment volume according to Yilmaz et al (2008).
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
-    bqthr : baseflow exceedance probability
-    lqthr : low flow exceedance probability
-    hqthr : high flow exceedance probability
-    pqthr : peak flow exceedance probability
-    warning_msg : If True, print warining messages.
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
+        bqthr (float, optional): baseflow exceedance probability (default is 0.9)
+        lqthr (float, optional): low flow exceedance probability (default is 0.7)
+        hqthr (float, optional): high flow exceedance probability (default is 0.2)
+        pqthr (float, optional): peak flow exceedance probability (default is 0.1)
+        warning_msg (bool, optional): If True, print warining messages.
 
-    Returns
-    -------
-    Dictionary of pbias of peak flow, slope and low flow of FDC
+    Returns:
+        Dict[str, float]: Dictionary of pbias of peak flow, slope and low flow of FDC
 
-    References
-    ----------
-    Yilmaz, K. K., H. V. Gupta, and T. Wagener (2008), A process-based diagnostic approach to
+    References:
+        Yilmaz, K. K., H. V. Gupta, and T. Wagener (2008), A process-based diagnostic approach to
         modelevaluation: Application to the NWS distributed hydrologic model,
         Water Resource Research, 44, W09417,doi:10.1029/2007WR006716.
 
     """
-
     # Sort and rank
     y_true_sort = np.sort(y_true, axis=0)[::-1]
     y_pred_sort = np.sort(y_pred, axis=0)[::-1]
@@ -427,7 +417,9 @@ def pbias_fdc(
     else:
         pbias_hseg_fdc = np.nan
         if warning_msg:
-            warnings.warn("'denominator = 0', can't compute PBIAS for peak flow of FDC")
+            logger.warning(
+                "'denominator = 0', can't compute PBIAS for peak flow of FDC"
+            )
 
     # Compute pbias of midsegment slope of FDC
     term1 = y_pred_sort[np.abs(y_pred_prob - hqthr).argmin()]
@@ -443,11 +435,13 @@ def pbias_fdc(
         else:
             pbias_mseg_fdc = np.nan
             if warning_msg:
-                warnings.warn("'denominator = 0', can't compute PBIAS for slope of FDC")
+                logger.warning(
+                    "'denominator = 0', can't compute PBIAS for slope of FDC"
+                )
     else:
         pbias_mseg_fdc = np.nan
         if warning_msg:
-            warnings.warn(
+            logger.warning(
                 "'0 as argument for np.log', can't compute PBIAS for slope of FDC"
             )
 
@@ -469,13 +463,13 @@ def pbias_fdc(
         else:
             pbias_lseg_fdc = np.nan
             if warning_msg:
-                warnings.warn(
+                logger.warning(
                     "'denominator = 0', can't compute PBIAS for low flow of FDC"
                 )
     else:
         pbias_lseg_fdc = np.nan
         if warning_msg:
-            warnings.warn(
+            logger.warning(
                 "'0 as argument for np.log', can't compute PBIAS for low flow of FDC"
             )
 
@@ -489,27 +483,25 @@ def pbias_fdc(
 def categorical_score(
     y_true: pd.Series,
     y_pred: pd.Series,
-    threshold: Optional[float] = 0.9,
+    threshold: float,
 ) -> Dict[str, float]:
-    """Compute probability of detection (POD), probability of false_alarm (FAR),
-    cirtical success index (CSI) and frequency bias (FBIAS).
+    """Compute probability of detection (POD), probability of false_alarm (FAR), cirtical success index (CSI) and frequency bias (FBIAS).
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
-    threshold : threshold value in percentile (or non-exceedance probability)
+    Args:
+        y_true (pd.Series) : Ground truth or observations
+        y_pred (pd.Series) : Modeled values or simulations
+        threshold (float): threshold value for categorizing observations and simulations.
 
-    Returns
-    -------
-    Dictionary of  categorical score values
+
+    Returns:
+        Dictionary of categorical score values
 
     """
+    if threshold is None or pd.isna(threshold):
+        return {"POD": np.nan, "FAR": np.nan, "CSI": np.nan, "FBIAS": np.nan}
 
-    thresh_val = y_true.quantile(threshold)
-
-    observed = y_true > thresh_val
-    simulated = y_pred > thresh_val
+    observed = y_true > threshold
+    simulated = y_pred > threshold
     contingency_table = hm.compute_contingency_table(observed, simulated)
     pod = hm.probability_of_detection(contingency_table)
     far = hm.probability_of_false_alarm(contingency_table)
@@ -519,108 +511,36 @@ def categorical_score(
     return {"POD": pod, "FAR": far, "CSI": csi, "FBIAS": fbias}
 
 
-def event_based_metrics(
-    y_true: pd.Series,
-    y_pred: pd.Series,
-    threshold: Optional[float] = 0.9,
-    aggregation: Optional[str] = "median",
-) -> Dict[str, float]:
-    """Compute event-based metrics, including 1) absolute peak flow bias (PKBIAS), 2)absolute peak timing error (PKTE), and
-    3) absolute event volume bias (EVBIAS).
+def get_threshold_value(data: pd.Series, threshold: dict) -> float:
+    """Get threshold value based on the specified threshold type and value.
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
-    threshold : threshold value in percentile or non-exceedance probabilities for defining events;
-                events with peak values smaller than this threshold are not considered in calculating the metrics
-    aggregation: method for aggrating the event-based metrics (mean or median)
+    Args:
+        data (pd.Series): time series data (e.g., observed values) used to calculate threshold value when threshold type is "quantile"
+        threshold (dict): Dictionary containing threshold value and type. Example: {"value": 0.9, "type": "quantile"} or {"value": 10, "type": "absolute"}
 
-    Returns
-    -------
-    Dictionary of event-based metrics
+    Returns:
+        float: threshold value
 
     """
-    # step 0: deal with missing observations & simulations
-
-    # first resample the data into hourly, do interpolation with short periods of missing data
-    y_true0 = y_true.copy()
-    y_true0 = (
-        y_true0.resample("h")
-        .first()
-        .interpolate(method="linear", limit=5, limit_direction="both")
-    )
-
-    y_pred0 = y_pred.copy()
-    y_pred0 = (
-        y_pred0.resample("h")
-        .first()
-        .interpolate(method="linear", limit=5, limit_direction="both")
-    )
-
-    # then break the data into a number of chunks without missing data,
-    # so that event identification/pairing can be conducted separately for each chunk
-
-    # 1) break the time series by NaN
-    y_true_chunks = np.split(y_true0, np.where(np.isnan(y_true0))[0])
-    # 2) remove NaN entries
-    y_true_chunks = [
-        p1[~np.isnan(p1)] for p1 in y_true_chunks if not isinstance(p1, np.ndarray)
-    ]
-    # 3) remove series that are too short (for now, ignore chunks short than 10 hours)
-    y_true_chunks = [p1 for p1 in y_true_chunks if len(p1) >= 10]
-
-    if len(y_true_chunks) == 0:
-        logger.info("Events cannot be calculated due to missing data")
-        return {"PKBIAS": np.nan, "PKTE": np.nan, "EVBIAS": np.nan}
-
-    events_all = pd.DataFrame()
-    for y_true in y_true_chunks:
-        # retrieve model simulation for the same time period
-        y_pred = y_pred0.loc[y_true.index]
-
-        # step 1: initial event detection for observed and model streamflows
-        events_obs = identify_events(y_true)
-        events_mod = identify_events(y_pred)
-        if len(events_obs) == 0:
-            continue
-
-        # step 2: event discretization based on initial events for model and observations
-        events_obs_new = separate_compound_events(events_obs, y_true)
-        events_mod_new = separate_compound_events(events_mod, y_pred)
-        if len(events_obs_new) == 0 or len(events_mod_new) == 0:
-            continue
-
-        # step 3: event pairing
-        thresh_val = y_true.quantile(threshold)
-        events_paired = pair_events(events_obs_new, events_mod_new, thresh_val)
-
-        # combine events from different chunks
-        events_all = pd.concat([events_all, events_paired], ignore_index=True)
-
-    # step 4: compute event-based metrics (and aggregate by median by default)
-    if len(events_all) > 0:
-        metrics = compute_event_metrics(events_all, y_true0, y_pred0, aggregation)
+    if threshold["type"] == "quantile":
+        thresh_val = data.quantile(threshold["value"])
+    elif threshold["type"] == "absolute":
+        thresh_val = threshold["value"]
     else:
-        logger.warning(
-            "No paired events found and event-based metrics cannot be calculated"
-        )
-        return {"PKBIAS": np.nan, "PKTE": np.nan, "EVBIAS": np.nan}
+        msg = f"Unsupported threshold type: {threshold['type']}. Please use 'quantile' or 'absolute'."
+        logger.error(msg)
+        raise Exception(msg)
 
-    return {
-        "PKBIAS": metrics["peak_bias"],
-        "PKTE": metrics["ptime_err"],
-        "EVBIAS": metrics["event_bias"],
-    }
+    return thresh_val
 
 
 _all_metric_funcs = {
     "CORR": pearson_corr,
-    "NSE": NSE,
-    "NNSE": NSE,
-    "NSElog": NSE,
-    "NSEwt": Weighted_NSE,
-    "KGE": KGE,
+    "NSE": nse,
+    "NNSE": nse,
+    "NSElog": nse,
+    "NSEwt": weighted_nse,
+    "KGE": kge,
     "MAE": mean_abs_error,
     "RMSE": root_mean_squared_error,
     "RSR": rmse_std_ratio,
@@ -665,22 +585,20 @@ def calculate_metrics(
     y_true: pd.Series,
     y_pred: pd.Series,
     metrics: Optional[list] = [],
-    threshold: Optional[float] = 0.9,
-    threshold_event: Optional[float] = 0.9,
+    threshold_categorical: Optional[dict] = {"value": 0.9, "type": "quantile"},
+    threshold_event: Optional[dict] = {"value": 0.9, "type": "quantile"},
 ) -> Dict[str, float]:
-    """Compute All Statistical Metrics between simulation and observation.
+    """Compute all statistical metrics between simulation and observation.
 
-    Parameters
-    ----------
-    y_true : Ground truth or observations
-    y_pred : Modeled values or simulations
-    metrics: list of metrics to be calcualted; if undefined, calcualte all metrics
-    threshold : threshold value for calculating categorical scores
-    thershold_event : non-exceedance probability threshold for defining events
+    Args:
+        y_true (pd.Series): Ground truth or observations
+        y_pred (pd.Series): Modeled values or simulations
+        metrics (list, optional): list of metrics to be calculated; if undefined, calculate all metrics
+        threshold_categorical (dict, optional): threshold value for calculating categorical scores. Default is {"value": 0.9, "type": "quantile"}.
+        threshold_event (dict, optional): threshold value for defining events. Default is {"value": 0.9, "type": "quantile"}.
 
-    Returns
-    ----------
-    result : dictionary of metric values
+    Returns:
+        Dict[str, float]: dictionary of metric values
 
     """
     metrics_all = _all_metrics.keys()
@@ -714,11 +632,15 @@ def calculate_metrics(
         elif m1 == "NNSE":
             result.update({m1: f1(y_true, y_pred, normalized=True)})
         elif m1 in ["POD", "FAR", "CSI", "FBIAS"]:
-            result.update(f1(y_true, y_pred))
+            result.update(
+                f1(y_true, y_pred, get_threshold_value(y_true, threshold_categorical))
+            )
         elif m1 in ["HSEG_FDC", "MSEG_FDC", "LSEG_FDC"]:
-            result.update(f1(y_true, y_pred, threshold))
+            result.update(f1(y_true, y_pred))
         elif m1 in ["PKBIAS", "PKTE", "EVBIAS"]:
-            result.update(f1(y_true, y_pred, threshold_event))
+            result.update(
+                f1(y_true, y_pred, get_threshold_value(y_true, threshold_event))
+            )
         else:
             raise Exception(f"Unsupported metric: {m1}")
 

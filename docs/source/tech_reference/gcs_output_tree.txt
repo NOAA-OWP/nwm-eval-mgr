@@ -1,0 +1,70 @@
+calib_basin_group1/
+├── joined/
+│   ├── v3_oct.nwm30.short_range.joined.parquet
+│   ├── v3_sep.nwm30.short_range.joined.parquet
+├── metrics/
+│   ├── v3_oct.nwm30.short_range.metrics.parquet
+│   ├── v3_sep.nwm30.short_range.metrics.parquet
+├── nwm30/
+│   ├── timeseries/
+│   │   ├── short_range/
+│   │   │   ├── 20240901T00.parquet
+│   │   │   ├── 20240901T01.parquet
+│   │   │   ├── 20240901T02.parquet
+│   │   │   ├── 20240901T03.parquet
+│   │   │   ├── 20240901T04.parquet
+│   │   │   └── ... (1435 more files)
+│   ├── zarr/
+│   │   ├── short_range/
+│   │   │   ├── nwm.20240901.nwm.t00z.short_range.channel_rt.f001.conus.nc.json
+│   │   │   ├── nwm.20240901.nwm.t00z.short_range.channel_rt.f002.conus.nc.json
+│   │   │   ├── nwm.20240901.nwm.t00z.short_range.channel_rt.f003.conus.nc.json
+│   │   │   ├── nwm.20240901.nwm.t00z.short_range.channel_rt.f004.conus.nc.json
+│   │   │   ├── nwm.20240901.nwm.t00z.short_range.channel_rt.f005.conus.nc.json
+│   │   │   └── ... (25915 more files)
+├── plots/
+│   ├── short_range/
+│   │   ├── boxplot/
+│   │   │   ├── boxplot_CORR.png
+│   │   │   ├── boxplot_KGE.png
+│   │   │   ├── boxplot_NNSE.png
+│   │   │   ├── boxplot_NSE.png
+│   │   ├── histogram/
+│   │   │   ├── hist_CORR_h1-5.png
+│   │   │   ├── hist_CORR_h1.png
+│   │   │   ├── hist_CORR_h10.png
+│   │   │   ├── hist_CORR_h11-18.png
+│   │   │   ├── hist_CORR_h15.png
+│   │   │   └── ... (31 more files)
+│   │   ├── spatial_map/
+│   │   │   ├── map_CORR_h1-5_v3_oct.png
+│   │   │   ├── map_CORR_h1-5_v3_sep.png
+│   │   │   ├── map_CORR_h10_v3_oct.png
+│   │   │   ├── map_CORR_h10_v3_sep.png
+│   │   │   ├── map_CORR_h11-18_v3_oct.png
+│   │   │   └── ... (67 more files)
+├── usgs/
+│   ├── 2024-09-01.parquet
+│   ├── 2024-09-02.parquet
+│   ├── 2024-09-03.parquet
+│   ├── 2024-09-04.parquet
+│   ├── 2024-09-05.parquet
+│   └── ... (58 more files)
+├── v3_oct/
+│   ├── short_range/
+│   │   ├── 20241001T00.parquet
+│   │   ├── 20241001T01.parquet
+│   │   ├── 20241001T02.parquet
+│   │   ├── 20241001T03.parquet
+│   │   ├── 20241001T04.parquet
+│   │   └── ... (715 more files)
+├── v3_sep/
+│   ├── short_range/
+│   │   ├── 20240901T00.parquet
+│   │   ├── 20240901T01.parquet
+│   │   ├── 20240901T02.parquet
+│   │   ├── 20240901T03.parquet
+│   │   ├── 20240901T04.parquet
+│   │   └── ... (715 more files)
+├── nwm_verf_config_expanded.yaml
+├── verification.log

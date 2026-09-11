@@ -1,0 +1,38 @@
+vpu_03S/
+├── gower/
+│   ├── ngen_simulation/
+│   │   ├── 20121001T03-20121001T10.parquet
+├── joined/
+│   ├── gower.ngen.ngen_simulation.joined.group0.parquet
+│   ├── gower.ngen.ngen_simulation.joined.group1.parquet
+│   ├── kmeans.ngen.ngen_simulation.joined.group0.parquet
+│   ├── kmeans.ngen.ngen_simulation.joined.group1.parquet
+├── kmeans/
+│   ├── ngen_simulation/
+│   │   ├── 20121001T03-20121001T10.parquet
+├── metrics/
+│   ├── gower.ngen.ngen_simulation.metrics.parquet
+│   ├── kmeans.ngen.ngen_simulation.metrics.parquet
+├── plots/
+│   ├── ngen_simulation/
+│   │   ├── boxplot/
+│   │   │   ├── boxplot_CORR.png
+│   │   │   ├── boxplot_KGE.png
+│   │   │   ├── boxplot_NNSE.png
+│   │   │   ├── boxplot_NSE.png
+│   │   ├── histogram/
+│   │   │   ├── hist_CORR.png
+│   │   │   ├── hist_KGE.png
+│   │   │   ├── hist_NNSE.png
+│   │   │   ├── hist_NSE.png
+│   │   ├── spatial_map/
+│   │   │   ├── map_CORR_gower.png
+│   │   │   ├── map_CORR_kmeans.png
+│   │   │   ├── map_KGE_gower.png
+│   │   │   ├── map_KGE_kmeans.png
+│   │   │   ├── map_NNSE_gower.png
+│   │   │   └── ... (3 more files)
+├── usgs/
+│   ├── 2012-10-01_2012-10-03.parquet
+├── nwm_verf_config_expanded.yaml
+├── verification.log

@@ -1,0 +1,9 @@
+sample_file_path|calib_basin_group1/usgs/2024-10-01.parquet
+title|Observation data, which includes the observed values for all locations and time steps.
+location_id|Location identifier (e.g., USGS gage ID).
+reference_time|Reference time of the observation.
+value_time|Time of the observed value.
+value|Observed value for a specific location and time step.
+variable_name|Name of the observed variable.
+measurement_unit|Unit of the observed value.
+configuration|NWM configuration of the observation.

@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nwm_eval"
+dynamic = ["version"]
+description = "Library for conducting NWM simulation evaluation and forecast verification."
+readme = "README.md"
+maintainers = [
+    { name = "Yuqiong Liu", email = "yuqiong.liu@entarian.com" },
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: Free To Use But Restricted",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Hydrology",
+    "Operating System :: OS Independent",
+]
+
+requires-python = ">=3.10"
+
+dependencies = [
+    "contextily",
+    "dask",
+    "geopandas",
+    "cartopy",
+    "matplotlib",
+    "pandas",
+    "seaborn",
+    "distributed",
+    "pydantic",
+    "netCDF4==1.6.3",
+    "numpy<2",
+    "fastparquet",
+    "tenacity",
+    "dataretrieval==1.1.0",
+    "teehr @ git+https://github.com/RTIInternational/teehr@1204e014fd9e3b320d6ee5c8eea04efc524ce0a7",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nwm_eval*"]
+
+
+[tool.setuptools.dynamic]
+version = {attr = "nwm_eval.__version__"}
+

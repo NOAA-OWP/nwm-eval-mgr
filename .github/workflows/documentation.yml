@@ -1,0 +1,36 @@
+name: documentation
+
+on:
+  push:
+    branches: [ "yliu_NGWPC-10472_refactor_eval_mgr" ]
+
+permissions:
+  contents: write
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install .[docs]
+          pip install -e ./nwm_metrics
+          pip install -e ./nwm_eval
+      - name: Debug Python imports
+        run: |
+          python -c "import nwm_eval; print('nwm_eval:', nwm_eval.__file__)"
+          python -c "import nwm_metrics; print('nwm_metrics:', nwm_metrics.__file__)"
+      - name: Sphinx build
+        run: |
+          sphinx-build docs/source docs/build
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: docs/build/
+          force_orphan: true

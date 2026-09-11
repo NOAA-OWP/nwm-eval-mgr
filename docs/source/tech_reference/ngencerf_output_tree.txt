@@ -1,0 +1,20 @@
+usgs_01123000/
+├── joined/
+│   ├── noah_cfes.ngen.short_range.joined.parquet
+├── metrics/
+│   ├── noah_cfes.ngen.short_range.metrics.parquet
+├── noah_cfes/
+│   ├── short_range/
+│   │   ├── 20221201T00.parquet
+├── plots/
+│   ├── short_range/
+│   │   ├── barchart/
+│   │   │   ├── barchart_all_metrics_01123000.png
+│   │   ├── metric_table/
+│   │   │   ├── metric_table_lead_h1-18_01123000.png
+│   │   ├── time_series/
+│   │   │   ├── time_series_T0_20221201T00.png
+├── usgs/
+│   ├── 2022-12-01_2022-12-03.parquet
+├── nwm_verf_config_expanded.yaml
+├── verification.log
