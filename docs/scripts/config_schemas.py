@@ -7,53 +7,65 @@ This script generates markdown documentation for the configuration schemas used 
 The generated markdown file is saved to `docs/source/config.md`.
 """
 
-import inspect
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Literal, get_args, get_origin
+from typing import Any, Literal, get_args, get_origin
 
+import nwm_eval.configuration as configuration
+from nwm_eval.configuration import (
+    BarChartConfig,
+    BasePlotConfig,
+    BoxPlotConfig,
+    Config,
+    FilePathsConfig,
+    FlowObservationConfig,
+    GeneralConfig,
+    HistogramConfig,
+    LeadTimesMixin,
+    LocationFilter,
+    MetricsConfig,
+    NWMForecastConfig,
+    PairDataConfig,
+    PlotsConfig,
+    ReferenceTimesMixin,
+    SpatialMapConfig,
+    TablePlotConfig,
+    TimeSeriesConfig,
+    USGSConfig,
+)
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
-
-import nwm_eval.configuration as configuration
-from nwm_eval.configuration import Config
 
 INDENT_LEVEL = 2
 YAML_COMMENT_BUFFER = 5
 NO_DESCRIPTION_STR = "No description provided"
 
-
-def get_all_schema_models(module):
-    """Retrieve all Pydantic schema models from a module."""
-    schemas = {}
-
-    for name, obj in inspect.getmembers(module):
-        # keep only classes
-        if not inspect.isclass(obj):
-            continue
-
-        # keep only BaseModel subclasses
-        if not issubclass(obj, BaseModel):
-            continue
-
-        # skip BaseModel itself
-        if obj is BaseModel:
-            continue
-
-        # optional: skip top-level Config model
-        if obj is Config:
-            continue
-
-        schemas[name] = obj
-
-    return schemas
-
+SCHEMAS_TO_CREATE = {
+    "general": GeneralConfig,
+    "file_paths": FilePathsConfig,
+    "nwm_forecast": NWMForecastConfig,
+    "flow_observation": FlowObservationConfig,
+    "flow_observation.usgs": USGSConfig,
+    "pair_data": PairDataConfig,
+    "metrics": MetricsConfig,
+    "plots": PlotsConfig,
+    "plots.barchart": BarChartConfig,
+    "plots.boxplot": BoxPlotConfig,
+    "plots.histogram": HistogramConfig,
+    "plots.table": TablePlotConfig,
+    "plots.time_series": TimeSeriesConfig,
+    "plots.spatial_map": SpatialMapConfig,
+    "Class: BasePlotConfig": BasePlotConfig,
+    "Class: LeadTimesMixin": LeadTimesMixin,
+    "Class: LocationFilter": LocationFilter,
+    "Class: ReferenceTimesMixin": ReferenceTimesMixin,
+}
 
 DOCS_TO_CREATE = {
     "config.yaml": {
         "example_file_class": (Config,),
-        "schemas": get_all_schema_models(configuration),
+        "schemas": SCHEMAS_TO_CREATE,
         "sample_files": [
             "configs/config_template.yaml",
             "configs/config_ngencerf.yaml",
@@ -62,11 +74,11 @@ DOCS_TO_CREATE = {
             "configs/config_ngensim.yaml",
         ],
         "sample_file_desc": {
-            "configs/config_template.yaml": "Config template generated from the pydantic model, with default or example values defined for each field. This can be used as a starting point for creating your own configuration files.",
-            "configs/config_ngencerf.yaml": "Sample config for verifying a single ngenCERF forecast at one location.",
-            "configs/config_hindcast.yaml": "Sample config for verifying multiple ngenCERF hindcasts at one location.",
-            "configs/config_nwm.yaml": "Sample config for verifying operational NWM v3 forecasts across multiple locations and domains using data retrieved from Google Cloud Storage (GCS).",
-            "configs/config_ngensim.yaml": "Sample config for evaluating large-scale NGEN simulations (e.g., from regionalization) across multiple locations, VPUs, or NWM domains.",
+            "configs/config_template.yaml": "Config template generated from the pydantic model including all available configuration options, with default or example values defined for each field. This can be used as a starting point for creating your own configuration files.",
+            "configs/config_ngencerf.yaml": "Sample config for verifying a single ngenCERF forecast at a single location, keeping only the necessary configuration options for this type of evaluation.",
+            "configs/config_hindcast.yaml": "Sample config for verifying multiple ngenCERF hindcasts at a single location, keeping only the necessary configuration options for this type of evaluation.",
+            "configs/config_nwm.yaml": "Sample config for verifying operational NWM v3 forecasts across multiple locations and domains using data retrieved from Google Cloud Storage (GCS), keeping only the necessary configuration options for this type of evaluation.",
+            "configs/config_ngensim.yaml": "Sample config for evaluating large-scale NGEN simulations (e.g., from regionalization) across multiple locations, VPUs, or NWM domains, keeping only the necessary configuration options for this type of evaluation.",
         },
         "sample_file_anchor": {
             "configs/config_template.yaml": "config-template-yaml",
@@ -86,11 +98,11 @@ def type_to_str(tp):
 
     if origin is None:  # Simple case e.g., str
         return getattr(tp, "__name__", str(tp))
-    elif origin in (list, List):
-        return f"List[{type_to_str(args[0])}]" if args else "List"
-    elif origin in (dict, Dict):
+    elif origin in (list, list):
+        return f"list[{type_to_str(args[0])}]" if args else "list"
+    elif origin in (dict, dict):
         return (
-            f"Dict[{type_to_str(args[0])}, {type_to_str(args[1])}]" if args else "Dict"
+            f"dict[{type_to_str(args[0])}, {type_to_str(args[1])}]" if args else "dict"
         )
     elif origin is Literal:
         return "str = " + " \\| ".join(map(str, args))
@@ -148,11 +160,11 @@ def field_to_dict(
             include_inherited_fields=include_inherited_fields,
         )
     else:
-        # Dict[str, BaseModel]
+        # dict[str, BaseModel]
         origin = get_origin(type_)
         args = get_args(type_)
         if (
-            origin in (dict, Dict)
+            origin in (dict, dict)
             and len(args) == 2
             and isinstance(args[1], type)
             and issubclass(args[1], BaseModel)
@@ -263,14 +275,14 @@ def dict_to_yaml(dict_rep: dict, indent: int = 0) -> list[str]:
 
 
 def is_dict_of_basemodel(field_dict: dict) -> bool:
-    """Check if a field dict represents a Dict[str, BaseModel]-like field."""
+    """Check if a field dict represents a dict[str, BaseModel]-like field."""
     type_ = field_dict.get("type")
     if type_ is None:
         return False
     origin = get_origin(type_)
     args = get_args(type_)
     return (
-        origin in (dict, Dict)
+        origin in (dict, dict)
         and len(args) == 2
         and isinstance(args[1], type)
         and issubclass(args[1], BaseModel)
@@ -408,7 +420,7 @@ def myst_anchor(title: str) -> str:
 
 def generate_toc_from_markdown(md_text: str) -> str:
     """Scan generated markdown, find headings, and return a TOC block (markdown)."""
-    toc_lines = ["### Table of Contents", ""]
+    toc_lines = ["## Table of Contents", ""]
 
     for line in md_text.splitlines():
         m = re.match(r"^(#{2,6})\s+(.*)", line)
@@ -433,7 +445,7 @@ def main(docs_to_create: dict) -> None:
     intro_block = ["# Configuration for Evaluation/Verification\n"]
 
     # Introduction text for the config documentation page
-    intro_block.append("### Introduction\n")
+    intro_block.append("## Introduction\n")
     intro_block.append(
         "This page provides detailed documentation for configuring the NWM Evaluation Manager (nwm-eval-mgr) tool for "
         "a variety of simulation evaluation or forecast verification applications.\n"
@@ -459,7 +471,9 @@ def main(docs_to_create: dict) -> None:
     # Generate sections for each config file
     lines = []
     for i in docs_to_create:
-        lines.append("### Sample Files\n")
+        # add MyST anchor for the sample files section
+        lines.append("(sample-files)=\n")
+        lines.append("## Sample Files\n")
 
         # Insert sample config files for different use cases
         sample_files = docs_to_create[i].get("sample_files", [])
@@ -472,7 +486,7 @@ def main(docs_to_create: dict) -> None:
             lines.append(
                 f"({docs_to_create[i]['sample_file_anchor'].get(sample_file, '')})="
             )
-            lines.append(f"#### `{sample_path.name}`\n")
+            lines.append(f"### `{sample_path.name}`\n")
             lines.append(docs_to_create[i]["sample_file_desc"].get(sample_file, ""))
             lines.append("")
 
@@ -493,7 +507,15 @@ def main(docs_to_create: dict) -> None:
 
             lines.append("```")
 
-        lines.append("### Schemas\n")
+        lines.append("")
+
+        # add MyST anchor for the schemas section
+        lines.append("(schemas)=\n")
+
+        lines.append("## Schemas\n")
+        lines.append(
+            "Schemas are organized by section in the YAML configuration file. For fields that use non-standard types, the schema of the corresponding class is also provided."
+        )
         for j, model_cls in docs_to_create[i]["schemas"].items():
             # Get direct parent class(es) dynamically
             parent_cls = [
@@ -504,15 +526,21 @@ def main(docs_to_create: dict) -> None:
 
             lines.append("")  # blank line before heading
 
+            # add MyST anchor for the individual schema section
+            lines.append(
+                f"({j.replace('_', '-').replace('.', '-').replace(': ', '-').lower()})=\n"
+            )
+
+            lines.append(f"### {j}")
+
+            class_info = f"Class `{model_cls.__name__}`."
             if parent_cls:
-                lines.append(
-                    f"#### `{j}` (inherits from `{', '.join(c.__name__ for c in parent_cls)}`)"
-                )  # heading with inheritance info
-            else:
-                lines.append(f"#### `{j}`")
+                class_info += (
+                    f" Inherits `{', '.join(c.__name__ for c in parent_cls)}`."
+                )
+            lines.append(class_info)
 
-            lines.append("")  # blank line before heading
-
+            lines.append("")  # blank line before the table
             lines.append(
                 generate_markdown_table(
                     model_cls,
@@ -529,7 +557,8 @@ def main(docs_to_create: dict) -> None:
     # Prepend intro and TOC
     md_text = intro_block + toc_block + md_text
 
-    Path("docs/source/config.md").write_text(md_text, encoding="utf-8")
+    config_file = Path(__file__).parent.parent / "source/config.md"
+    config_file.write_text(md_text, encoding="utf-8")
 
 
 if __name__ == "__main__":

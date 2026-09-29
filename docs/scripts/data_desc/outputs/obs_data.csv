@@ -1,9 +1,9 @@
-sample_file_path|calib_basin_group1/usgs/2024-10-01.parquet
-title|Observation data, which includes the observed values for all locations and time steps.
-location_id|Location identifier (e.g., USGS gage ID).
-reference_time|Reference time of the observation.
+sample_file_path|outputs/eval/vpu_03S/usgs/2012-10-01_2012-10-03.parquet
+title|Observation data including the observed values for all locations and time steps.
+location_id|Location identifier for the observed value.
+reference_time|Reference time for the observation (same as value_time for observations).
 value_time|Time of the observed value.
-value|Observed value for a specific location and time step.
-variable_name|Name of the observed variable.
-measurement_unit|Unit of the observed value.
-configuration|NWM configuration of the observation.
+value|Observed value for a specific location and time.
+variable_name|Name of the observed variable (e.g., streamflow).
+measurement_unit|Measurement unit of the observed variable (e.g., cubic meters per second).
+configuration|Configuration for the observation (e.g., usgs_gage_data).

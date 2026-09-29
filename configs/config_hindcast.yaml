@@ -14,14 +14,16 @@ general:
   nwm_version: [ngen, ngen] # list of NWM versions; must have the same length as 'dataset_name'
   forecast_start_date: ['2025-08-20 00:00:00', '2025-08-20 00:00:00'] # list of start dates for verification; must be same length as 'dataset_name'
   forecast_end_date: ['2025-08-22 06:00:00', '2025-08-22 06:00:00'] # list of end dates for verification; must be same length as 'dataset_name'
+  log_level: INFO # logging level (case insensitive); options are DEBUG, INFO, WARNING, SEVERE, FATAL, CRITICAL, ERROR
 
 file_paths:
-  base_dir: ~/repos/nwm-eval-mgr/data/ # root directory to store data/outputs for verification
+  base_dir: data/ # root directory to store data/outputs for verification
   crosswalk_file: '{base_dir}/inputs/gage_files/usgs_{nwm_version}_crosswalk_all_domains.parquet' # crosswalk file mapping gage IDs to NWM/ngen link IDs
   fcst_config_file: '{base_dir}/inputs/nwm_forecast_configuration.yaml' # NWM forecast configuration file
   fcst_data_dir: '{base_dir}/inputs/{location_set_name}/{dataset_name}/hind_run1' # forecast data directory or file (must be specified when nwm_forecast.data_source is set to ngenCERF or hinscast)
   fcst_data_file: '01123000_output.csv' # forecast data file path pattern (must be specified when nwm_forecast.data_source is set to ngenCERF or hinscast)
   output_dir: '{base_dir}/outputs/{location_set_name}_hindcast' # output directory to store all datasets, metrics and plots
+  log_file: '{output_dir}/verification.log'
 
 nwm_forecast:
   data_source: hindcast    # Specifies the source to retrieve the model forecast or simulation data. Currently supported options: GCS, ngenCERF, ngenSIM, hindcast

@@ -3,10 +3,12 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Union
+from typing import Literal
 
 import pandas as pd
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from .utils import check_options
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +20,13 @@ logging.basicConfig(
 class LocationFilter(BaseModel):
     """Data model for filtering locations based on column values in the crosswalk file."""
 
-    columns: str | List[str] | None = Field(
+    columns: str | list[str] | None = Field(
         description="Column name(s) in the crosswalk file to filter on. Can be a single string or a list of strings.",
         examples=["vpu_id", "status"],
         default=None,
     )
 
-    values: str | List[str] | None = Field(
+    values: str | list[str] | None = Field(
         description="Value(s) to filter on for the corresponding columns. Can be a single string or a list of strings.",
         examples=["03S", "USGS-active"],
         default=None,
@@ -82,7 +84,7 @@ class LocationFilter(BaseModel):
 class GeneralConfig(BaseModel):
     """Data model for the 'general' section of the config file."""
 
-    steps: Dict[str, bool] = Field(
+    steps: dict[str, bool] = Field(
         description=(
             "Dictionary specifying which steps to run. Keys are step names (e.g., 'fetch_fcst_data', 'fetch_obs_data', "
             "'pair_data', 'compute_metrics', 'plot_metrics'), and values are booleans indicating whether to run the step."
@@ -140,7 +142,7 @@ class GeneralConfig(BaseModel):
         default="usgs_01123000",
     )
 
-    location_list: List[str] | None = Field(
+    location_list: list[str] | None = Field(
         default=None,
         examples=[["01123000", "01123500"], ["50070900"]],
         description="List of specific locations to include in the evaluation. If None, all locations in the crosswalk file will be used.",
@@ -209,7 +211,7 @@ class GeneralConfig(BaseModel):
         ],
     )
 
-    dataset_name: List[str] = Field(
+    dataset_name: list[str] = Field(
         description=(
             "User-specified name(s) for the dataset(s) to evaluate (e.g., formulation name or regionalization algorithm). "
             "This will be used in naming output files and directories. If evaluating multiple datasets, this should be "
@@ -221,7 +223,7 @@ class GeneralConfig(BaseModel):
         examples=[["noah_cfes", "noah_topmodel"], ["gower"]],
     )
 
-    nwm_version: List[str] = Field(
+    nwm_version: list[str] = Field(
         description=(
             "List of NWM versions to evaluate. Valid options include 'ngen', 'nwm30', 'nwm22', etc. This should be "
             "a list of the same length as 'dataset_name', where each entry corresponds to the NWM version for the "
@@ -231,7 +233,7 @@ class GeneralConfig(BaseModel):
         examples=[["ngen", "nwm30"], ["ngen"]],
     )
 
-    forecast_start_date: List[str] = Field(
+    forecast_start_date: list[str] = Field(
         description=(
             "List of start dates for the forecast data to evaluate. This should be a list of the same length as 'dataset_name', "
             "where each entry corresponds to the start date for the dataset with the same index in 'dataset_name'"
@@ -245,7 +247,7 @@ class GeneralConfig(BaseModel):
         ],
     )
 
-    forecast_end_date: List[str] = Field(
+    forecast_end_date: list[str] = Field(
         description=(
             "List of end dates for the forecast data to evaluate. This should be a list of the same length as 'dataset_name', "
             "where each entry corresponds to the end date for the dataset with the same index in 'dataset_name'"
@@ -259,7 +261,7 @@ class GeneralConfig(BaseModel):
         ],
     )
 
-    eval_start_date: List[str] | None = Field(
+    eval_start_date: list[str] | None = Field(
         default=None,
         description=(
             "List of start dates for the evaluation period. This should be a list of the same length as 'dataset_name', "
@@ -276,7 +278,7 @@ class GeneralConfig(BaseModel):
         ],
     )
 
-    eval_end_date: List[str] | None = Field(
+    eval_end_date: list[str] | None = Field(
         default=None,
         description=(
             "List of end dates for the evaluation period. This should be a list of the same length as 'dataset_name', "
@@ -299,6 +301,12 @@ class GeneralConfig(BaseModel):
         description="Whether to distinguish calibrated and regionalized locations in the evaluation",
     )
 
+    log_level: str = Field(
+        description="Logging level. Valid options (case insensitive): debug, info, warning, error, critical, severe, fatal",
+        examples=["debug", "info", "warning", "error", "critical", "severe", "fatal"],
+        default="info",
+    )
+
     @field_validator("domain", mode="before")
     @classmethod
     def normalize_domain(cls, v):
@@ -306,6 +314,22 @@ class GeneralConfig(BaseModel):
         if isinstance(v, str):
             return v.lower()
         return v
+
+    @model_validator(mode="after")
+    def check_log_level(self):
+        """Ensure that the log level is valid."""
+        # valid log levels for logging module (case insensitive)
+        valid_levels = [
+            "DEBUG",
+            "INFO",
+            "WARNING",
+            "SEVERE",  # maps to ERROR
+            "FATAL",  # maps to CRITICAL
+            "CRITICAL",
+            "ERROR",
+        ]
+        check_options(self.log_level.upper(), valid_levels, "log level")
+        return self
 
 
 class FilePathsConfig(BaseModel):
@@ -334,7 +358,7 @@ class FilePathsConfig(BaseModel):
         },
     )
 
-    crosswalk_file: Path | str | Dict[str, Path] | Dict[str, str] = Field(
+    crosswalk_file: Path | str | dict[str, Path] | dict[str, str] = Field(
         examples=[
             Path("~/crosswalk.csv"),
             {
@@ -368,19 +392,19 @@ class FilePathsConfig(BaseModel):
         },
     )
 
-    fcst_data_file: Optional[Path | str | Dict[str, Path] | Dict[str, str]] = Field(
+    fcst_data_file: Path | str | dict[str, Path] | dict[str, str] | None = Field(
         default=None,
         examples=["01123000_output.csv"],
         description="Path to the forecast data file or a dictionary of forecast data files.",
     )
 
-    fcst_data_dir: Path | str | Dict[str, Path] | Dict[str, str] | None = Field(
+    fcst_data_dir: Path | str | dict[str, Path] | dict[str, str] | None = Field(
         default=None,
         examples=["data/inputs/hindcasts/"],
         description="Path to the directory containing forecast data files or a dictionary of directories.",
     )
 
-    obs_data_file: Optional[Path | str] = Field(
+    obs_data_file: Path | str | None = Field(
         default=None,
         examples=["data/inputs/obs/01123000_hourly_discharge.csv"],
         description=(
@@ -391,7 +415,7 @@ class FilePathsConfig(BaseModel):
         ),
     )
 
-    obs_data_dir: Optional[Path | str] = Field(
+    obs_data_dir: Path | str | None = Field(
         default=None,
         examples=["data/inputs/obs/"],
         description=(
@@ -423,6 +447,12 @@ class FilePathsConfig(BaseModel):
         examples=["ngen_evaluation/outputs/usgs_01123000/"],
     )
 
+    log_file: str | Path | None = Field(
+        default=None,
+        description="Path to log file. Default: verification.log in {output_dir}",
+        examples=["outputs/usgs_01123000/verification.log"],
+    )
+
 
 class NWMForecastConfig(BaseModel):
     """Data model for the 'nwm_forecast' section of the config file."""
@@ -442,7 +472,7 @@ class NWMForecastConfig(BaseModel):
         examples=["ngenCERF", "ngenSIM", "hindcast", "GCS"],
     )
 
-    fetch_fcst: List[bool] | None = Field(
+    fetch_fcst: list[bool] | None = Field(
         default=[True],
         examples=[[True], [True, False]],
         description=(
@@ -463,7 +493,7 @@ class NWMForecastConfig(BaseModel):
         ),
     )
 
-    t_minus: List[int] | None = Field(
+    t_minus: list[int] | None = Field(
         default=[0, 1, 2],
         examples=[[0], [0, 1, 2]],
         description=(
@@ -477,7 +507,7 @@ class NWMForecastConfig(BaseModel):
 
     kerchunk_method: str | None = Field(
         default="local",
-        examples=["zarr", "parquet"],
+        examples=["local", "remote", "auto"],
         description=(
             "Specifies the preference in creating Kerchunk reference json files. Only needed for data_source = 'GCS'. "
             "'local' - always create new json files from netcdf files in GCS and save locally, if they do not already exist; "
@@ -611,7 +641,7 @@ class PairDataConfig(BaseModel):
 class LeadTimesMixin(BaseModel):
     """Mixin class to add lead_times field and validation to metric and plot configs."""
 
-    lead_times: List[str] | None = Field(
+    lead_times: list[str] | None = Field(
         default=None,
         examples=[
             ["all", "1-5", "5-10", "10-15", "all_aggregated"],
@@ -644,7 +674,7 @@ class LeadTimesMixin(BaseModel):
 class ReferenceTimesMixin(BaseModel):
     """Mixin class to add reference_times field and validation to metric and plot configs."""
 
-    reference_times: List[datetime] | None = Field(
+    reference_times: list[datetime] | None = Field(
         default=None,
         examples=[["2022-12-01 00:00:00", "2022-12-15 00:00:00"]],
         description=(
@@ -684,7 +714,7 @@ class MetricsConfig(LeadTimesMixin):
         ),
     )
 
-    metric_subset: str | List[str] = Field(
+    metric_subset: str | list[str] = Field(
         examples=["all", ["NSE", "KGE"]],
         description=(
             "Subset of metrics to compute. Can be 'all' or a list of metric names. If 'all', all available metrics in "
@@ -695,7 +725,7 @@ class MetricsConfig(LeadTimesMixin):
         },
     )
 
-    metric_exclude: List[str] | None = Field(
+    metric_exclude: list[str] | None = Field(
         default=None,
         examples=[["HSEG_FDC", "MSEG_FDC", "LSEG_FDC"], ["NSE"]],
         description=(
@@ -703,7 +733,7 @@ class MetricsConfig(LeadTimesMixin):
         ),
     )
 
-    threshold_categorical: Optional[dict[str, Union[float, str]]] = Field(
+    threshold_categorical: dict[str, float | str] | None = Field(
         default={"value": 0.9, "type": "quantile"},
         examples=[
             {"value": 0.9, "type": "quantile"},
@@ -716,7 +746,7 @@ class MetricsConfig(LeadTimesMixin):
         ),
     )
 
-    threshold_event: Optional[dict[str, Union[float, str]]] = Field(
+    threshold_event: dict[str, float | str] | None = Field(
         default={"value": 0.9, "type": "quantile"},
         examples=[
             {"value": 0.9, "type": "quantile"},
@@ -736,7 +766,7 @@ class MetricsConfig(LeadTimesMixin):
     )
 
 
-Number = Union[int, float]
+Number = int | float
 
 
 class BasePlotConfig(LeadTimesMixin):
@@ -754,7 +784,7 @@ class BasePlotConfig(LeadTimesMixin):
         },
     )
 
-    metric_subset: Union[str, List[str]] | None = Field(
+    metric_subset: str | list[str] | None = Field(
         default=None,
         examples=[["NSE", "KGE"], "all"],
         description=(
@@ -780,7 +810,7 @@ class BasePlotConfig(LeadTimesMixin):
 class HistogramConfig(BasePlotConfig):
     """Config for histogram plots."""
 
-    binning: Dict[str, List[Number]] | None = Field(
+    binning: dict[str, list[Number]] | None = Field(
         default={
             "NSE": [-1, -0.5, 0, 0.5, 1],
             "KGE": [-1, -0.5, 0, 0.5, 1],
@@ -818,7 +848,7 @@ class BoxPlotConfig(BasePlotConfig):
 class SpatialMapConfig(BasePlotConfig):
     """Config for spatial maps."""
 
-    scaling: Dict[str, List[Number]] | None = Field(
+    scaling: dict[str, list[Number]] | None = Field(
         default={
             "NSE": [-0.5, 1.0],
             "KGE": [-0.5, 1.0],
@@ -843,7 +873,7 @@ class SpatialMapConfig(BasePlotConfig):
 class TimeSeriesConfig(BasePlotConfig, ReferenceTimesMixin):
     """Config for time series plots."""
 
-    lead_times: List[int] | None = Field(
+    lead_times: list[int] | None = Field(
         default=None,
         examples=[[1, 2, 3], [6, 12, 24]],
         description=(
@@ -1041,23 +1071,31 @@ class Config(BaseModel):
         """
         for plot_type in ["time_series", "metric_table", "barchart"]:
             plot_conf = getattr(self.plots, plot_type, None)
-            if plot_conf and getattr(plot_conf, "plot", False):
-                if self.nwm_forecast.data_source.lower() not in [
+            if (
+                plot_conf
+                and getattr(plot_conf, "plot", False)
+                and self.nwm_forecast.data_source.lower()
+                not in [
                     "ngencerf",
                     "hindcast",
-                ]:
-                    msg = f"{plot_type} is only applicable if nwm_forecast.data_source is 'ngenCERF' or 'hindcast'"
-                    logger.error(msg)
-                    raise ValueError(msg)
+                ]
+            ):
+                msg = f"{plot_type} is only applicable if nwm_forecast.data_source is 'ngenCERF' or 'hindcast'"
+                logger.error(msg)
+                raise ValueError(msg)
 
         for plot_type in ["spatial_map", "histogram", "boxplot"]:
             plot_conf = getattr(self.plots, plot_type, None)
-            if plot_conf and getattr(plot_conf, "plot", False):
-                if self.nwm_forecast.data_source.lower() not in [
+            if (
+                plot_conf
+                and getattr(plot_conf, "plot", False)
+                and self.nwm_forecast.data_source.lower()
+                not in [
                     "gcs",
                     "ngensim",
-                ]:
-                    msg = f"{plot_type} is only applicable if nwm_forecast.data_source is 'GCS' or 'ngenSIM'"
-                    logger.error(msg)
-                    raise ValueError(msg)
+                ]
+            ):
+                msg = f"{plot_type} is only applicable if nwm_forecast.data_source is 'GCS' or 'ngenSIM'"
+                logger.error(msg)
+                raise ValueError(msg)
         return self

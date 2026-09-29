@@ -1,0 +1,9 @@
+sample_file_path|outputs/ngen/regionalization/test_kmeans/vpu_03S/Output/troute_output_201210010000.nc
+title|Troute output for the given configuration.
+type|Type
+flow|Flow (m3 s-1)
+velocity|Velocity (m/s)
+depth|Depth (m)
+nudge|Streamflow Nudge Value (m3 s-1)
+time|valid output time (seconds since 2012-10-01)
+feature_id|Segment ID

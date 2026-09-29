@@ -23,6 +23,7 @@ general:     # General configuration for the evaluation, including dataset infor
   eval_start_date: ['2022-12-11 00:00:00', '2022-12-25 00:00:00']     # Start date(s) for the evaluation period.
   eval_end_date: ['2022-12-31 00:00:00', '2023-01-15 00:00:00']     # End date(s) for the evaluation period.
   separate_calibrated: False     # Whether to distinguish calibrated and regionalized locations in the evaluation
+  log_level: 'info'     # Logging level. Valid options (case insensitive): debug, info, warning, error, critical, severe, fatal
 file_paths:     # Configuration for file paths used in the evaluation, including input data and output directories.
   base_dir: '~/ngen_evaluation/'     # Root directory for storing data and outputs.
   location_list_file: ~/location_list.csv     # Path to a file containing the list of locations to evaluate
@@ -31,10 +32,11 @@ file_paths:     # Configuration for file paths used in the evaluation, including
   fcst_data_file: '01123000_output.csv'     # Path to the forecast data file or a dictionary of forecast data files.
   fcst_data_dir: 'data/inputs/hindcasts/'     # Path to the directory containing forecast data files or a dictionary of directories.
   obs_data_file: 'data/inputs/obs/01123000_hourly_discharge.csv'     # Path to the observation data file. Both obs_data_file and obs_data_dir can be specified. The run will read all .csv and .parquet files in obs_data_dir and obs_data_file and remove duplicates.If neither obs_data_file nor obs_data_dir is provided, an observation data source must be specified in the 'flow_observation.usgs' section.
-  obs_data_dir: 'data/inputs/obs/'     # ("Path to the observation data directory where one or more observation data files are stored. The run will look for all .csv and .parquet files in this directory. Each file can contain observation data for a single location (with the filename starting with the location identifier), or multiple locations with a 'location_id' column specifying the location identifiers.",)
+  obs_data_dir: 'data/inputs/obs/'     # Path to the observation data directory where one or more observation data files are stored. The run will look for all .csv and .parquet files in this directory. Each file can contain observation data for a single location (with the filename starting with the location identifier), or multiple locations with a 'location_id' column specifying the location identifiers.
   calib_param_file: 'data/inputs/calib_params.csv'     # Path to the calibration parameter file.
   txdot_gage_file: 'data/inputs/gage_files/tx_gauges.csv'     # Path to the TxDOT gage file.
   output_dir: 'ngen_evaluation/outputs/usgs_01123000/'     # Directory to save outputs such as paired data, computed metrics, and plots. 
+  log_file: 'outputs/usgs_01123000/verification.log'     # Path to log file. Default: verification.log in {output_dir}
 nwm_forecast:     # Configuration for NWM forecast data.
   data_source: 'ngenCERF'     # Data source for the NWM forecast. Valid options include 'ngenCERF', 'ngenSIM', 'hindcast', and 'GCS'.
   fetch_fcst: [True]     # Whether to fetch forecast data for each dataset, with local file existence check.

@@ -36,6 +36,9 @@ class ProcessConfig(BaseModel):
             "base_dir": self.config.file_paths.base_dir
             if hasattr(self.config.file_paths, "base_dir")
             else None,
+            "output_dir": self.config.file_paths.output_dir
+            if hasattr(self.config.file_paths, "output_dir")
+            else None,
             "domain": self.config.general.domain
             if hasattr(self.config.general, "domain")
             else None,
@@ -196,11 +199,16 @@ class ProcessConfig(BaseModel):
 
     def setup_logger(self) -> None:
         """Set up logging configuration."""
-        log_file = Path(self.config.file_paths.output_dir) / "verification.log"
-        log_level = "INFO"
+        log_file = self.config.file_paths.log_file
+        if not log_file:
+            log_file = Path(self.config.file_paths.output_dir) / "verification.log"
+
+        log_level = self.config.general.log_level
+        if not log_level:
+            log_level = "INFO"
+
         setup_logging(
             level=log_level,
-            # target_packages=("__main__", "nwm.verf"),
             log_file=log_file,
             file_level=log_level,
             filter_stderr=True,

@@ -1,9 +1,9 @@
-sample_file_path|nhf/usgs_ngen_crosswalk_conus.parquet
-title|Crosswalk between USGS gages and NextGen catchments for the CONUS domain.
+sample_file_path|inputs/eval/usgs_ngen_crosswalk_conus.parquet
+title|Crosswalk between USGS gages and NextGen catchments for a given domain (e.g., conus).
 domain|NWM domain (e.g., CONUS).
 vpu_id|Unique identifier for Virtual Processing Unit (VPU).
-primary_location_id|Gage ID.
-secondary_location_id|Catchment ID.
+primary_location_id|Primary location identifier (e.g., USGS gage ID).
+secondary_location_id|Secondary location identifier (e.g., NextGen catchment ID).
 basin_area_km2|Basin area in square kilometers.
-status|Status of the gage (e.g., "active" or "inactive").
-geometry|Geometry of the gage location.
+status|Status of the gage (e.g., "USGS-active" or "USGS-discontinued").
+geometry|Geometry of the catchment.

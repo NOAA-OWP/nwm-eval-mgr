@@ -2,8 +2,11 @@
 Configuration file for the Sphinx documentation builder.
 """
 
-from pathlib import Path
+import os
 import sys
+from pathlib import Path
+
+import nwm_eval
 
 # ---------------------------------------------------------------------
 # Ensure both packages are importable from src/ layout
@@ -16,7 +19,8 @@ sys.path.insert(0, str(ROOT / "nwm_metrics" / "src"))
 # ---------------------------------------------------------------------
 # Import version safely (do NOT rely on __version__)
 # ---------------------------------------------------------------------
-from importlib.metadata import version as get_version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as get_version
 
 try:
     version = get_version("nwm_eval")
@@ -58,6 +62,7 @@ myst_enable_extensions = [
     "deflist",
     "dollarmath",
     "amsmath",
+    "substitution",
 ]
 
 autosummary_generate = True
@@ -89,9 +94,41 @@ html_theme_options = {
     "navbar_persistent": ["search-button"],
     "navbar_align": "content",
     "header_links_before_dropdown": 5,
+    # "show_toc_level": 3,
 }
 
 html_sidebars = {
     "user_guide": [],
     "faq": [],
+}
+
+# Substitutions
+version = str(nwm_eval.__version__)
+
+GITHUB_ORG = os.getenv("GITHUB_ORG", "NGWPC")
+
+myst_substitutions = {
+    "github_org": GITHUB_ORG,
+    "github_org_lower": GITHUB_ORG.lower(),
+    "pip_install_metrics": f"""```bash
+pip install "git+https://github.com/{GITHUB_ORG}/nwm-eval-mgr.git@development#subdirectory=nwm_metrics"
+```""",
+    "pip_install_eval": f"""```bash
+pip install "git+https://github.com/{GITHUB_ORG}/nwm-eval-mgr.git@development#subdirectory=nwm_eval"
+```""",
+    "pip_install_both": f"""```bash
+pip install "git+https://github.com/{GITHUB_ORG}/nwm-eval-mgr.git@development#subdirectory=nwm_metrics"
+pip install "git+https://github.com/{GITHUB_ORG}/nwm-eval-mgr.git@development#subdirectory=nwm_eval"
+```""",
+    "reproducible_install": f"""```bash
+pip install "git+https://github.com/{GITHUB_ORG}/nwm-eval-mgr.git@<commit_sha>#subdirectory=nwm_metrics"
+pip install "git+https://github.com/{GITHUB_ORG}/nwm-eval-mgr.git@<commit_sha>#subdirectory=nwm_eval"
+```""",
+    "reproducible_install_ex": f"""```bash
+pip install "git+https://github.com/{GITHUB_ORG}/nwm-eval-mgr.git@87bcac530ca36a604da1ee27401f161a767f5c44#subdirectory=nwm_metrics"
+```""",
+    "clone_repo": f"""```bash
+git clone https://github.com/{GITHUB_ORG}/nwm-eval-mgr.git
+cd nwm-eval-mgr
+```""",
 }

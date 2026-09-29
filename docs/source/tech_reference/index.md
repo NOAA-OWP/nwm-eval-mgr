@@ -6,7 +6,8 @@ The following pages provide technical details for the workflow, inputs and outpu
 :maxdepth: 1
 :caption: Subsections
 
-Workflow<workflow>
+Overview<overview>
+Metrics<metrics>
 Input data<input_data>
 Output directory structure<output_tree>
 Output Tables<output_data>
