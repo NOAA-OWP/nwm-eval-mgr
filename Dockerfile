@@ -7,16 +7,30 @@
 # from source. Python 3.11 is currently required because the pinned TEEHR
 # dependency restricts DuckDB to an older release that does not provide a
 # compatible Python 3.12 wheel.
+#
+# The base is also pinned by digest so it cannot change underneath the same
+# tag. The digest is what gets pulled; the tag stays for readability. It is the
+# multi-arch index digest, so builds still resolve the right platform. Refresh
+# the tag and PYTHON_IMAGE_DIGEST together:
+#   docker buildx imagetools inspect python:<version>-slim-bookworm
 ############################################################################
 
-ARG BASE_IMAGE=python:3.11-slim-bookworm
+ARG PYTHON_IMAGE_DIGEST=sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84
+ARG BASE_IMAGE=python:3.11-slim-bookworm@${PYTHON_IMAGE_DIGEST}
 
 FROM ${BASE_IMAGE}
 
+# application root
+ARG APP_ROOT=/ngen-app
+
 # OCI metadata arguments
 ARG BASE_IMAGE
+ARG PYTHON_IMAGE_DIGEST
 ARG BASE_IMAGE_NAME="${BASE_IMAGE}"
-ARG BASE_IMAGE_DIGEST="unknown"
+# The base is pinned by digest above, so the label defaults to that same
+# digest. Override BASE_IMAGE and BASE_IMAGE_DIGEST together when building
+# from a different base.
+ARG BASE_IMAGE_DIGEST="${PYTHON_IMAGE_DIGEST}"
 ARG BASE_REVISION="unknown"
 ARG IMAGE_SOURCE="unknown"
 ARG IMAGE_VENDOR="unknown"
@@ -78,11 +92,11 @@ SHELL ["/bin/bash", "-c"]
 
 # Create a dedicated virtual environment for nwm_metrics and nwm_eval so their
 # Python packages are isolated from the base image's global site-packages.
-ENV VIRTUAL_ENV="/ngen-app/nwm-eval-mgr-python"
+ENV VIRTUAL_ENV="${APP_ROOT}/nwm-eval-mgr-python"
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
 RUN set -eux; \
-    mkdir -p /ngen-app; \
+    mkdir -p "${APP_ROOT}"; \
     python -m venv "${VIRTUAL_ENV}"
 
 # Install current Python packaging and PEP 517 build tools before installing
@@ -101,9 +115,9 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-bookworm \
 # NWM/NextGen Evaluation Manager
 ############################################################################
 
-COPY . /ngen-app/nwm-eval-mgr/
+COPY . "${APP_ROOT}/nwm-eval-mgr/"
 
-WORKDIR /ngen-app/nwm-eval-mgr/
+WORKDIR "${APP_ROOT}/nwm-eval-mgr/"
 
 # Install nwm_metrics first because nwm_eval depends on it. The pip cache is
 # retained across builds, while the installed packages remain in the image.
@@ -115,7 +129,7 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-bookworm \
 
 COPY --chmod=0755 \
     ./docker/run-nwm-eval-mgr.sh \
-    /ngen-app/bin/run-nwm-eval-mgr.sh
+    "${APP_ROOT}/bin/run-nwm-eval-mgr.sh"
 
 ############################################################################
 # Git build information
@@ -127,7 +141,7 @@ RUN set -eux; \
     repo_url="$(git config --get remote.origin.url)"; \
     key="${repo_url##*/}"; \
     key="${key%.git}"; \
-    GIT_INFO_PATH="/ngen-app/${key}_git_info.json"; \
+    GIT_INFO_PATH="${APP_ROOT}/${key}_git_info.json"; \
     branch="$([ -n "${CI_COMMIT_REF_NAME:-}" ] && echo "${CI_COMMIT_REF_NAME}" || git rev-parse --abbrev-ref HEAD)"; \
     jq -n \
         --arg commit_hash "$(git rev-parse HEAD)" \
@@ -140,7 +154,11 @@ RUN set -eux; \
         "{\"${key}\": {commit_hash: \$commit_hash, branch: \$branch, tags: \$tags, author: \$author, commit_date: \$commit_date, message: \$message, build_date: \$build_date}}" \
         > "${GIT_INFO_PATH}"
 
+RUN ln -s "${APP_ROOT}/bin/run-nwm-eval-mgr.sh" \
+    /usr/local/bin/run-nwm-eval-mgr
+
 WORKDIR /
 
-ENTRYPOINT ["/ngen-app/bin/run-nwm-eval-mgr.sh"]
+#ENTRYPOINT ["${APP_ROOT}/bin/run-nwm-eval-mgr.sh"]
+ENTRYPOINT ["/usr/local/bin/run-nwm-eval-mgr"]
 CMD ["--help"]

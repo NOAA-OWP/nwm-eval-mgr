@@ -6,9 +6,9 @@ Schemas
 gage_crosswalk
 --------------
 
-Crosswalk between USGS gages and NextGen catchments for the CONUS domain.
+Crosswalk between USGS gages and NextGen catchments for a given domain (e.g., conus).
 
-Sample file path: ``nhf/usgs_ngen_crosswalk_conus.parquet``
+Sample file path: ``inputs/eval/usgs_ngen_crosswalk_conus.parquet``
 
 .. note:: Geometry column omitted from preview table for brevity.
 
@@ -18,9 +18,9 @@ Sample file path: ``nhf/usgs_ngen_crosswalk_conus.parquet``
    :header-rows: 1
 
    "domain", "vpu_id", "primary_location_id", "secondary_location_id", "basin_area_km2", "status"
-   "CONUS", "01", "usgs-01118300", "ngen-3308860", "13.74", "USGS-active"
-   "CONUS", "01", "usgs-01118400", "ngen-3308834", "43.77", "USGS-discontinued"
-   "CONUS", "01", "usgs-01118668", "ngen-3309403", "36.65", "USGS-discontinued"
+   "CONUS", "01", "usgs-01118300", "ngen-1285848541835259", "13.74", "USGS-active"
+   "CONUS", "01", "usgs-01118400", "ngen-1285847199882424", "43.77", "USGS-discontinued"
+   "CONUS", "01", "usgs-01118668", "ngen-1285847048692311", "36.65", "USGS-discontinued"
 
 **Schema:**
 
@@ -39,11 +39,11 @@ Sample file path: ``nhf/usgs_ngen_crosswalk_conus.parquet``
      - object
 
    * - primary_location_id
-     - Gage ID.
+     - Primary location identifier (e.g., USGS gage ID).
      - object
 
    * - secondary_location_id
-     - Catchment ID.
+     - Secondary location identifier (e.g., NextGen catchment ID).
      - object
 
    * - basin_area_km2
@@ -51,13 +51,75 @@ Sample file path: ``nhf/usgs_ngen_crosswalk_conus.parquet``
      - float64
 
    * - status
-     - Status of the gage (e.g., "active" or "inactive").
+     - Status of the gage (e.g., "USGS-active" or "USGS-discontinued").
      - object
 
    * - geometry
-     - Geometry of the gage location.
+     - Geometry of the catchment.
      - object
 
+
+
+.. _troute_output:
+
+troute_output
+-------------
+
+Troute output for the given configuration.
+
+Sample file path: ``outputs/ngen/regionalization/test_kmeans/vpu_03S/Output/troute_output_201210010000.nc``
+
+**Schema:**
+
+.. list-table::
+   :header-rows: 1
+
+   * - Variable
+     - Description
+     - Type
+     - Dimensions
+     - Example values
+   * - type
+     - Type
+     - <U2
+     - feature_id
+     - wb, wb, wb
+
+   * - flow
+     - Flow (m3 s-1)
+     - float32
+     - feature_id, time
+     - 0.0, 0.0, 0.0
+
+   * - velocity
+     - Velocity (m/s)
+     - float32
+     - feature_id, time
+     - 0.0, 0.0, 0.0
+
+   * - depth
+     - Depth (m)
+     - float32
+     - feature_id, time
+     - 0.0, 0.0, 0.0
+
+   * - nudge
+     - Streamflow Nudge Value (m3 s-1)
+     - float32
+     - feature_id, time
+     - nan, nan, nan
+
+   * - time
+     - valid output time (seconds since 2012-10-01)
+     - float64
+     - time
+     - 1349053200000000000, 1349056800000000000, 1349060400000000000
+
+   * - feature_id
+     - Segment ID
+     - int64
+     - feature_id
+     - 1072639236903480, 1072639243699931, 1072639267016356
 
 
 

@@ -74,6 +74,7 @@ general:     # General configuration for the evaluation, including dataset infor
   eval_start_date: ['2022-12-11 00:00:00', '2022-12-25 00:00:00']     # Start date(s) for the evaluation period.
   eval_end_date: ['2022-12-31 00:00:00', '2023-01-15 00:00:00']     # End date(s) for the evaluation period.
   separate_calibrated: False     # Whether to distinguish calibrated and regionalized locations in the evaluation
+  log_level: 'info'     # Logging level. Valid options (case insensitive): debug, info, warning, error, critical, severe, fatal
 file_paths:     # Configuration for file paths used in the evaluation, including input data and output directories.
   base_dir: '~/ngen_evaluation/'     # Root directory for storing data and outputs.
   location_list_file: ~/location_list.csv     # Path to a file containing the list of locations to evaluate
@@ -82,10 +83,11 @@ file_paths:     # Configuration for file paths used in the evaluation, including
   fcst_data_file: '01123000_output.csv'     # Path to the forecast data file or a dictionary of forecast data files.
   fcst_data_dir: 'data/inputs/hindcasts/'     # Path to the directory containing forecast data files or a dictionary of directories.
   obs_data_file: 'data/inputs/obs/01123000_hourly_discharge.csv'     # Path to the observation data file. Both obs_data_file and obs_data_dir can be specified. The run will read all .csv and .parquet files in obs_data_dir and obs_data_file and remove duplicates.If neither obs_data_file nor obs_data_dir is provided, an observation data source must be specified in the 'flow_observation.usgs' section.
-  obs_data_dir: 'data/inputs/obs/'     # ("Path to the observation data directory where one or more observation data files are stored. The run will look for all .csv and .parquet files in this directory. Each file can contain observation data for a single location (with the filename starting with the location identifier), or multiple locations with a 'location_id' column specifying the location identifiers.",)
+  obs_data_dir: 'data/inputs/obs/'     # Path to the observation data directory where one or more observation data files are stored. The run will look for all .csv and .parquet files in this directory. Each file can contain observation data for a single location (with the filename starting with the location identifier), or multiple locations with a 'location_id' column specifying the location identifiers.
   calib_param_file: 'data/inputs/calib_params.csv'     # Path to the calibration parameter file.
   txdot_gage_file: 'data/inputs/gage_files/tx_gauges.csv'     # Path to the TxDOT gage file.
   output_dir: 'ngen_evaluation/outputs/usgs_01123000/'     # Directory to save outputs such as paired data, computed metrics, and plots. 
+  log_file: 'outputs/usgs_01123000/verification.log'     # Path to log file. Default: verification.log in {output_dir}
 nwm_forecast:     # Configuration for NWM forecast data.
   data_source: 'ngenCERF'     # Data source for the NWM forecast. Valid options include 'ngenCERF', 'ngenSIM', 'hindcast', and 'GCS'.
   fetch_fcst: [True]     # Whether to fetch forecast data for each dataset, with local file existence check.
@@ -178,13 +180,15 @@ general:
   nwm_version: [ngen] # list of NWM versions; must have the same length as 'dataset_name'
   forecast_start_date: ['2022-12-01 00:00:00'] # list of start dates for verification; must be same length as 'dataset_name'
   forecast_end_date: ['2022-12-01 00:00:00'] # list of end dates for verification; must be same length as 'dataset_name'
+  log_level: INFO # logging level (case insensitive); options are DEBUG, INFO, WARNING, SEVERE, FATAL, CRITICAL, ERROR
 
 file_paths:
-  base_dir: ~/repos/nwm-eval-mgr/data/ # root directory to store data/outputs for verification
+  base_dir: data/ # root directory to store data/outputs for verification
   crosswalk_file: '{base_dir}/inputs/gage_files/usgs_{nwm_version}_crosswalk_all_domains.parquet' # crosswalk file mapping gage IDs to NWM/ngen link IDs
   fcst_config_file: '{base_dir}/inputs/nwm_forecast_configuration.yaml' # NWM forecast configuration file
   fcst_data_file: '{base_dir}/inputs/{location_set_name}/{dataset_name}/{nwm_configuration}.csv' # forecast data directory (must be specified when nwm_forecast.data_source is set to ngenCERF)
   output_dir: '{base_dir}/outputs/{location_set_name}' # output directory to store all datasets, metrics and plots
+  log_file: '{output_dir}/verification.log'
 
 nwm_forecast:
   data_source: ngenCERF    # Specifies the source to retrieve the model forecast or simulation data. Currently supported options: GCS, ngenCERF, ngenSIM
@@ -243,14 +247,16 @@ general:
   nwm_version: [ngen, ngen] # list of NWM versions; must have the same length as 'dataset_name'
   forecast_start_date: ['2025-08-20 00:00:00', '2025-08-20 00:00:00'] # list of start dates for verification; must be same length as 'dataset_name'
   forecast_end_date: ['2025-08-22 06:00:00', '2025-08-22 06:00:00'] # list of end dates for verification; must be same length as 'dataset_name'
+  log_level: INFO # logging level (case insensitive); options are DEBUG, INFO, WARNING, SEVERE, FATAL, CRITICAL, ERROR
 
 file_paths:
-  base_dir: ~/repos/nwm-eval-mgr/data/ # root directory to store data/outputs for verification
+  base_dir: data/ # root directory to store data/outputs for verification
   crosswalk_file: '{base_dir}/inputs/gage_files/usgs_{nwm_version}_crosswalk_all_domains.parquet' # crosswalk file mapping gage IDs to NWM/ngen link IDs
   fcst_config_file: '{base_dir}/inputs/nwm_forecast_configuration.yaml' # NWM forecast configuration file
   fcst_data_dir: '{base_dir}/inputs/{location_set_name}/{dataset_name}/hind_run1' # forecast data directory or file (must be specified when nwm_forecast.data_source is set to ngenCERF or hinscast)
   fcst_data_file: '01123000_output.csv' # forecast data file path pattern (must be specified when nwm_forecast.data_source is set to ngenCERF or hinscast)
   output_dir: '{base_dir}/outputs/{location_set_name}_hindcast' # output directory to store all datasets, metrics and plots
+  log_file: '{output_dir}/verification.log'
 
 nwm_forecast:
   data_source: hindcast    # Specifies the source to retrieve the model forecast or simulation data. Currently supported options: GCS, ngenCERF, ngenSIM, hindcast
@@ -313,6 +319,7 @@ general: # define which of the 5 steps to run; each step can be run independentl
   nwm_version: [nwm30, nwm30] # list of NWM versions; must have the same length as 'dataset_name'.
   forecast_start_date: ['2024-09-01 00:00:00', '2024-10-01 00:00:00'] # list of start date for forecast verification period; list must have the same length as 'dataset_name'
   forecast_end_date: ['2024-09-30 23:00:00', '2024-10-30 23:00:00'] # list of end date for forecast verification period; list must have the same length as 'dataset_name'
+  log_level: INFO # logging level (case insensitive); options are DEBUG, INFO, WARNING, SEVERE, FATAL, CRITICAL, ERROR
 
 file_paths:  
   base_dir: ~/repos/nwm-eval-mgr/data/  # root directory to store the downloaded NWM forecast and flow observation data
@@ -320,6 +327,7 @@ file_paths:
   crosswalk_file: '{base_dir}/inputs/gage_files/usgs_{nwm_version}_crosswalk_all_domains.parquet' # parquet files containing the crosswalk between NWM feature_id and usgs gage id  
   fcst_config_file: '{base_dir}/inputs/nwm_forecast_configuration.yaml' # NWM forecast configuration file  
   output_dir: '{base_dir}/outputs/{location_set_name}' # output directory to store all datasets and plots
+  log_file: '{output_dir}/verification.log'
 
 nwm_forecast:
   data_source: GCS    # Specifies the source to retrieve the model forecast or simulation data. Currently supported options: GCS, ngenCERF, ngenSIM
@@ -432,13 +440,15 @@ general:
   eval_start_date: ['2012-10-01 03:00:00', '2012-10-01 03:00:00'] # start date for evaluation period, only used for ngenSIM
   eval_end_date: ['2012-10-01 10:00:00', '2012-10-01 10:00:00'] # end date for evaluation period, only used for ngenSIM
   separate_calibrated: true # whether to distinguish calibrated and regionalized locations in the evaluation
+  log_level: INFO # logging level (case insensitive); options are DEBUG, INFO, WARNING, SEVERE, FATAL, CRITICAL, ERROR
 
 file_paths:
-  base_dir: ~/repos/nwm-eval-mgr/data/ # root directory to store data/outputs for verification
+  base_dir: data/ # root directory to store data/outputs for verification
   crosswalk_file: '{base_dir}/inputs/nhf/usgs_{nwm_version}_crosswalk_{domain}.parquet' # crosswalk file mapping gage IDs to NWM/ngen link IDs
   fcst_data_file: '{base_dir}/inputs/troute_output_201210010000_{dataset_name}.nc' # forecast data directory (must be specified when nwm_forecast.data_source is set to ngenCERF)
   calib_param_file: '{base_dir}/../../nwm-region-mgr/data/inputs/region/pseudo_calib_params/sampled_params_{domain}.csv' # calibration parameters file (used when separate_calibrated is True); must have column 'gage_id'
   output_dir: '{base_dir}/outputs/{location_set_name}' # output directory to store all datasets, metrics and plots
+  log_file: '{output_dir}/verification.log'
 
 nwm_forecast:
   data_source: ngenSIM   # Specifies the source to retrieve the model forecast or simulation data. Currently supported options: GCS, ngenCERF, ngenSIM
@@ -540,10 +550,11 @@ plots:
 | fcst_data_file | Path \| str \| Dict[str, Path] \| Dict[str, str] \| NoneType | Path to the forecast data file or a dictionary of forecast data files. | None | 01123000_output.csv |
 | fcst_data_dir | Path \| str \| Dict[str, Path] \| Dict[str, str] \| NoneType | Path to the directory containing forecast data files or a dictionary of directories. | None | data/inputs/hindcasts/ |
 | obs_data_file | Path \| str \| NoneType | Path to the observation data file. Both obs_data_file and obs_data_dir can be specified. The run will read all .csv and .parquet files in obs_data_dir and obs_data_file and remove duplicates.If neither obs_data_file nor obs_data_dir is provided, an observation data source must be specified in the 'flow_observation.usgs' section. | None | data/inputs/obs/01123000_hourly_discharge.csv |
-| obs_data_dir | Path \| str \| NoneType | ("Path to the observation data directory where one or more observation data files are stored. The run will look for all .csv and .parquet files in this directory. Each file can contain observation data for a single location (with the filename starting with the location identifier), or multiple locations with a 'location_id' column specifying the location identifiers.",) | None | data/inputs/obs/ |
+| obs_data_dir | Path \| str \| NoneType | Path to the observation data directory where one or more observation data files are stored. The run will look for all .csv and .parquet files in this directory. Each file can contain observation data for a single location (with the filename starting with the location identifier), or multiple locations with a 'location_id' column specifying the location identifiers. | None | data/inputs/obs/ |
 | calib_param_file | Path \| str \| NoneType | Path to the calibration parameter file. | None | data/inputs/calib_params.csv |
 | txdot_gage_file | Path \| str \| NoneType | Path to the TxDOT gage file. This is only needed if evaluating TxDOT locations, for which streamflow observations are retrieved differently than USGS gages. If not provided, the default TxDOT list defined in settings.py will be used.  | None | data/inputs/gage_files/tx_gauges.csv |
 | output_dir | str \| Path | Directory to save outputs such as paired data, computed metrics, and plots.  | None | ngen_evaluation/outputs/usgs_01123000/ |
+| log_file | str \| Path \| NoneType | Path to log file. Default: verification.log in {output_dir} | None | outputs/usgs_01123000/verification.log |
 
 #### `FlowObservationConfig`
 
@@ -572,6 +583,7 @@ plots:
 | eval_start_date | List[str] \| NoneType | List of start dates for the evaluation period. This should be a list of the same length as 'dataset_name', where each entry corresponds to the start date for the evaluation period of the dataset with the same index in 'dataset_name'. If not provided, the evaluation will start from the earliest available date in the paired forecast and observation data for each dataset. | None | ['2022-12-11 00:00:00', '2022-12-25 00:00:00'] |
 | eval_end_date | List[str] \| NoneType | List of end dates for the evaluation period. This should be a list of the same length as 'dataset_name', where each entry corresponds to the end date for the evaluation period of the dataset with the same index in 'dataset_name'. If not provided, the evaluation will end at the latest available date in the paired forecast and observation data for each dataset. | None | ['2022-12-31 00:00:00', '2023-01-15 00:00:00'] |
 | separate_calibrated | bool \| NoneType | Whether to distinguish calibrated and regionalized locations in the evaluation | None | False |
+| log_level | str | Logging level. Valid options (case insensitive): debug, info, warning, error, critical, severe, fatal | info | debug |
 
 #### `HistogramConfig` (inherits from `BasePlotConfig`)
 
@@ -612,7 +624,7 @@ plots:
 | fetch_fcst | List[bool] \| NoneType | List of booleans indicating whether to fetch forecast data for each dataset. If False, forecast data will be retrieved regardless of whether it already exists locally. Otherwise, skip fetching if forecast data file already exists locally.  | [True] | [True] |
 | output_type | str \| NoneType | Type of NWM output to retrieve. Currently only 'channel_rt' is supported. Only applicable when data_source='GCS'.  | channel_rt | channel_rt |
 | t_minus | List[int] \| NoneType | List of integers indicating the T-minus hours for which to retrieve NWM forecasts. Only applicable when data_source='GCS' and nwm_configuration is an AnA run (analysis & assimilation). | [0, 1, 2] | [0] |
-| kerchunk_method | str \| NoneType | Specifies the preference in creating Kerchunk reference json files. Only needed for data_source = 'GCS'. 'local' - always create new json files from netcdf files in GCS and save locally, if they do not already exist; 'remote' - read the CIROH pre-generated jsons from s3, ignoring any that are unavailable; 'auto' - read the CIROH pre-generated jsons from s3, and create any that are unavailable, storing locally | local | zarr |
+| kerchunk_method | str \| NoneType | Specifies the preference in creating Kerchunk reference json files. Only needed for data_source = 'GCS'. 'local' - always create new json files from netcdf files in GCS and save locally, if they do not already exist; 'remote' - read the CIROH pre-generated jsons from s3, ignoring any that are unavailable; 'auto' - read the CIROH pre-generated jsons from s3, and create any that are unavailable, storing locally | local | local |
 | process_by_z_hour | bool \| NoneType | Only applicable when data_source='GCS'. If True, NWM files will be processed by z-hour per day. If False, files will be processed in chunks (defined by STEPSIZE). This can help if you want to read many reaches at once (all ~2.7 million for medium range for example). | True | False |
 | stepsize | int \| NoneType | Only applicable when data_source='GCS' and process_by_z_hour=False. Controls how many files are processed in memory at once. Higher values can increase performance at the expense on memory.  | 100 | 50 |
 | ignore_missing_file | bool \| NoneType | Only applicable when data_source='GCS'. If True, the missing file(s) will be skipped and the process will resume. If False, TEEHR will fail if a missing NWM file is encountered. | True | False |

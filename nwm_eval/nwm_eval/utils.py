@@ -188,7 +188,17 @@ def recursive_substitute(obj: Any, context: dict) -> Any:
 
     elif isinstance(obj, str):
         try:
-            return expand_with_lists(obj, context)
+            value = obj
+
+            for _ in range(5):
+                new_value = expand_with_lists(value, context)
+
+                if not isinstance(new_value, str) or new_value == value:
+                    return new_value
+
+                value = new_value
+
+            return value
         except KeyError:
             return obj  # leave unchanged if substitution fails
 
@@ -469,3 +479,15 @@ def read_data(
     df.columns = df.columns.str.strip()
 
     return df
+
+
+def check_options(options: str | list[str], valid_options: list[str], var: str):
+    """Check if the provided options are valid against a list of valid options."""
+    if isinstance(options, str):
+        options = [options]
+
+    options_unsupported = set(options) - set(valid_options)
+    if options_unsupported:
+        raise ValueError(
+            f"Unsupported options for {var}: {options_unsupported}. Valid options are: {valid_options}"
+        )

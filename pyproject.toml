@@ -12,8 +12,9 @@ maintainers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest~=8.4.1", "ruff~=0.12.10", "python-dotenv~=1.2.1", "boto3"]
-docs = ["sphinx", "numpydoc", "sphinx_rtd_theme", "sphinx_design", "pydata-sphinx-theme", "sphinx-autodoc-typehints", "myst-parser"]
+dev = ["pytest~=8.4.1", "ruff~=0.12.10", "python-dotenv~=1.2.1"]
+docs = ["sphinx", "numpydoc", "sphinx_rtd_theme", "sphinx_design", "pydata-sphinx-theme", "sphinx-autodoc-typehints", 
+"myst-parser","boto3==1.43.75","netCDF4==1.6.3", "xarray", "pyarrow"]
 
 [tool.setuptools]
 packages = []

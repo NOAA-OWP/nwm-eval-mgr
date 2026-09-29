@@ -8,7 +8,6 @@ on:
       - main
       - nwm-main
       - development
-      - development-pw
       - release-candidate
   push:
     branches:
@@ -17,7 +16,6 @@ on:
       - main
       - nwm-main
       - development
-      - development-pw
       - release-candidate
   workflow_dispatch:
 
@@ -225,23 +223,13 @@ jobs:
             --all \
             "docker://${IMAGE_BASE}:${TEST_TAG}" "docker://${IMAGE_BASE}:${ALIAS_TAG}"
 
-          # Branch-keyed promotion: development promotes 'latest' (AWS lane);
-          # development-pw promotes 'latest-pw' (PW lane). Do not manually
-          # dispatch a cross-lane build from either branch: promotion keys off
-          # the branch name, so the tested image would promote under the wrong
-          # alias.
+          # pushes to development also promote 'latest'
           if [ "$GITHUB_REF_NAME" = "development" ]; then
             skopeo copy \
               --src-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
               --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
               --all \
               "docker://${IMAGE_BASE}:${TEST_TAG}" "docker://${IMAGE_BASE}:latest"
-          elif [ "$GITHUB_REF_NAME" = "development-pw" ]; then
-            skopeo copy \
-              --src-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
-              --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
-              --all \
-              "docker://${IMAGE_BASE}:${TEST_TAG}" "docker://${IMAGE_BASE}:latest-pw"
           fi
 
   # Build the Apptainer .sif from the tested + promoted image and publish it to
@@ -301,17 +289,11 @@ jobs:
           apptainer push nwm-eval-mgr.sif "oras://${SIF_REPO}:${ALIAS_TAG}"
           echo "Published oras://${SIF_REPO}:${ALIAS_TAG}"
 
-          # Branch-keyed SIF promotion, mirroring the image promotion above:
-          # development also publishes ':latest', development-pw ':latest-pw'.
-          # The registry already holds the SIF blob from the push above, so this
-          # re-push uploads only the manifest and tag, not the multi-GB SIF. Do
-          # not manually dispatch a cross-lane build from either branch:
-          # promotion keys off the branch name, so the SIF would promote under
-          # the wrong alias.
+          # SIF promotion, mirroring the image promotion above: pushes to
+          # development also publish ':latest'. The registry already holds the
+          # SIF blob from the push above, so this re-push uploads only the
+          # manifest and tag, not the multi-GB SIF.
           if [ "$GITHUB_REF_NAME" = "development" ]; then
             apptainer push nwm-eval-mgr.sif "oras://${SIF_REPO}:latest"
             echo "Promoted oras://${SIF_REPO}:latest"
-          elif [ "$GITHUB_REF_NAME" = "development-pw" ]; then
-            apptainer push nwm-eval-mgr.sif "oras://${SIF_REPO}:latest-pw"
-            echo "Promoted oras://${SIF_REPO}:latest-pw"
           fi

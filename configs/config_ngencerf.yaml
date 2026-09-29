@@ -14,13 +14,15 @@ general:
   nwm_version: [ngen] # list of NWM versions; must have the same length as 'dataset_name'
   forecast_start_date: ['2022-12-01 00:00:00'] # list of start dates for verification; must be same length as 'dataset_name'
   forecast_end_date: ['2022-12-01 00:00:00'] # list of end dates for verification; must be same length as 'dataset_name'
+  log_level: INFO # logging level (case insensitive); options are DEBUG, INFO, WARNING, SEVERE, FATAL, CRITICAL, ERROR
 
 file_paths:
-  base_dir: ~/repos/nwm-eval-mgr/data/ # root directory to store data/outputs for verification
+  base_dir: data/ # root directory to store data/outputs for verification
   crosswalk_file: '{base_dir}/inputs/gage_files/usgs_{nwm_version}_crosswalk_all_domains.parquet' # crosswalk file mapping gage IDs to NWM/ngen link IDs
   fcst_config_file: '{base_dir}/inputs/nwm_forecast_configuration.yaml' # NWM forecast configuration file
   fcst_data_file: '{base_dir}/inputs/{location_set_name}/{dataset_name}/{nwm_configuration}.csv' # forecast data directory (must be specified when nwm_forecast.data_source is set to ngenCERF)
   output_dir: '{base_dir}/outputs/{location_set_name}' # output directory to store all datasets, metrics and plots
+  log_file: '{output_dir}/verification.log'
 
 nwm_forecast:
   data_source: ngenCERF    # Specifies the source to retrieve the model forecast or simulation data. Currently supported options: GCS, ngenCERF, ngenSIM

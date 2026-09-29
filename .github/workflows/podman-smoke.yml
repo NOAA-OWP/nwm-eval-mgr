@@ -1,0 +1,111 @@
+# .github/workflows/podman-smoke.yml
+# ADDITIVE WORKFLOW: Proves Podman build and smoke verification.
+# Leaves existing .github/workflows/ci-cd.yml and Apptainer SIF builds untouched.
+
+name: Podman Build & Smoke (Additive)
+
+on:
+  workflow_dispatch:
+    inputs:
+      push_images:
+        description: "Push test tags (:podman-test) to GHCR"
+        required: true
+        type: boolean
+        default: false
+  pull_request:
+    branches:
+      - development
+    paths:
+      - '.github/workflows/podman-smoke.yml'
+      - 'Dockerfile'
+      - 'docker/**'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  podman-build-smoke:
+    name: Podman Build & Smoke (Pilot)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Preinstalled Podman Environment
+        run: |
+          podman version
+          podman info --format 'OS: {{.Host.Distribution.Distribution}} {{.Host.Distribution.Version}} | Storage: {{.Store.GraphDriverName}}'
+
+      - name: Build Image with Podman (Docker Format)
+        id: build
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="localhost/nwm-eval-mgr:podman-test"
+
+          echo "Building ${IMAGE_TAG} using existing Dockerfile with --format docker..."
+          podman build \
+            --format docker \
+            -f Dockerfile \
+            -t "${IMAGE_TAG}" \
+            .
+
+          echo "IMAGE_LOCAL=${IMAGE_TAG}" >> "${GITHUB_ENV}"
+
+      - name: Smoke Probe 1 - Entrypoint CLI Help & Usage Check
+        run: |
+          # docker/run-nwm-eval-mgr.sh intentionally exits 1 on --help.
+          # We disable -e during execution to capture the exit code under pipefail.
+          set +e
+          podman run --rm "${IMAGE_LOCAL}" --help 2>&1 | tee entrypoint-smoke.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          set -e
+
+          echo "Entrypoint returned exit code: ${EXIT_CODE}"
+          if [ "${EXIT_CODE}" -ne 1 ]; then
+            echo "ERROR: Expected run-nwm-eval-mgr --help to exit with 1, got ${EXIT_CODE}"
+            exit 1
+          fi
+
+          # The installed ENTRYPOINT is /usr/local/bin/run-nwm-eval-mgr (basename has NO .sh)
+          if ! grep -q 'Usage: run-nwm-eval-mgr' entrypoint-smoke.log; then
+            echo "ERROR: Expected 'Usage: run-nwm-eval-mgr' text not found in output"
+            exit 1
+          fi
+          echo "Probe 1 Passed: Entrypoint CLI successfully executed and parsed flags."
+
+      - name: Smoke Probe 2 - Python Environment & Package Import
+        run: |
+          set -euo pipefail
+          echo "Verifying nwm_eval and nwm_metrics packages inside the virtual environment..."
+          podman run --rm --entrypoint python "${IMAGE_LOCAL}" \
+            -c "import nwm_metrics, nwm_eval; print('Probe 2 Passed: Python virtual environment and packages healthy.')"
+
+      - name: Inspect Built OCI Image
+        run: |
+          podman image inspect "${IMAGE_LOCAL}" \
+            --format 'Image ID: {{.Id}} | Digest: {{.Digest}} | Entrypoint: {{.Config.Entrypoint}} | Cmd: {{.Config.Cmd}}'
+
+      - name: Optional GHCR Push (:podman-test only)
+        if: ${{ inputs.push_images }}
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io \
+            -u "${{ github.actor }}" --password-stdin
+
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          DEST_BASE="ghcr.io/${REPO_LOWER}"
+          TAG_TEST="${DEST_BASE}:podman-test"
+          TAG_SHA="${DEST_BASE}:${{ github.sha }}-podman-test"
+
+          echo "Publishing test verification tags..."
+          podman tag "${IMAGE_LOCAL}" "${TAG_TEST}"
+          podman tag "${IMAGE_LOCAL}" "${TAG_SHA}"
+
+          podman push "${TAG_TEST}"
+          podman push "${TAG_SHA}"
+
+          echo "Pushed ${TAG_TEST} and ${TAG_SHA}"
+          echo "NOTICE: Production aliases (:latest, branch tags) remain untouched."

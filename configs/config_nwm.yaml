@@ -13,13 +13,15 @@ general: # define which of the 5 steps to run; each step can be run independentl
   nwm_version: [nwm30, nwm30] # list of NWM versions; must have the same length as 'dataset_name'.
   forecast_start_date: ['2024-09-01 00:00:00', '2024-10-01 00:00:00'] # list of start date for forecast verification period; list must have the same length as 'dataset_name'
   forecast_end_date: ['2024-09-30 23:00:00', '2024-10-30 23:00:00'] # list of end date for forecast verification period; list must have the same length as 'dataset_name'
+  log_level: INFO # logging level (case insensitive); options are DEBUG, INFO, WARNING, SEVERE, FATAL, CRITICAL, ERROR
 
 file_paths:  
-  base_dir: ~/repos/nwm-eval-mgr/data/  # root directory to store the downloaded NWM forecast and flow observation data
+  base_dir: data/  # root directory to store the downloaded NWM forecast and flow observation data
   location_list_file: "{base_dir}/inputs/gage_files/usgs_gages_link_CONUS_calib100.csv" # [optional] file path for the list of locations (e.g., gage IDs or NWM link IDs)
   crosswalk_file: '{base_dir}/inputs/gage_files/usgs_{nwm_version}_crosswalk_all_domains.parquet' # parquet files containing the crosswalk between NWM feature_id and usgs gage id  
   fcst_config_file: '{base_dir}/inputs/nwm_forecast_configuration.yaml' # NWM forecast configuration file  
   output_dir: '{base_dir}/outputs/{location_set_name}' # output directory to store all datasets and plots
+  log_file: '{output_dir}/verification.log'
 
 nwm_forecast:
   data_source: GCS    # Specifies the source to retrieve the model forecast or simulation data. Currently supported options: GCS, ngenCERF, ngenSIM

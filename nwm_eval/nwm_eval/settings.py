@@ -212,58 +212,47 @@ def data_paths(conf: dict) -> dict:
     """Define the data paths for observations, forecasts, and outputs based on the configuration file."""
     conf1 = conf["general"]
     conf2 = conf["file_paths"]
-    root_dir = conf2["base_dir"]
-    sub_dir = conf2["output_dir"]  # conf1["location_set_name"]
+    out_dir = Path(conf2["output_dir"])
     config = conf1["nwm_configuration"]
 
     # paths for all observations
-    obs_dir = Path(root_dir, sub_dir, "usgs")
+    obs_dir = out_dir / "usgs"
 
     # paths for forecast datasets
-    fcst_data_dir = dict()
-    fcst_json_dir = dict()
-    fcst_data_link_dir = dict()
-    paired_data_file = dict()
-    metric_file = dict()
+    fcst_data_dir = {}
+    fcst_json_dir = {}
+    fcst_data_link_dir = {}
+    paired_data_file = {}
+    metric_file = {}
     for idx, dataset in enumerate(conf1["dataset_name"]):
+        nwm_ver = conf1["nwm_version"][idx]
+
         # create output directories based on NWM version
-        fcst_json_dir[dataset] = Path(
-            root_dir, sub_dir, conf1["nwm_version"][idx], "zarr", config
-        )
-        fcst_data_dir[dataset] = Path(
-            root_dir, sub_dir, conf1["nwm_version"][idx], "timeseries", config
-        )
+        fcst_json_dir[dataset] = out_dir / nwm_ver / "zarr" / config
+        fcst_data_dir[dataset] = out_dir / nwm_ver / "timeseries" / config
 
         # create additional directory for storing symbolic links to parquet files required for each dataset
-        fcst_data_link_dir[dataset] = Path(
-            root_dir,
-            sub_dir,
-            conf1["dataset_name"][idx],
-            conf1["nwm_configuration"],  # "fcst"
+        fcst_data_link_dir[dataset] = (
+            out_dir / conf1["dataset_name"][idx] / conf1["nwm_configuration"]
         )
 
         # path for joined parquet files (note in pair_data.py, 'group*' will be added to the file name for individual location groups)
-        filename = (
-            f"{dataset}."
-            f"{conf1['nwm_version'][idx]}."
-            f"{conf1['nwm_configuration']}."
-            "joined.parquet"
-        )
-        paired_data_file[dataset] = Path(root_dir, sub_dir, "joined", filename)
+        filename = f"{dataset}.{nwm_ver}.{conf1['nwm_configuration']}.joined.parquet"
+        paired_data_file[dataset] = out_dir / "joined" / filename
 
         # path for metric output files
-        metric_file[dataset] = Path(
-            root_dir, sub_dir, "metrics", filename.replace("joined", "metrics")
+        metric_file[dataset] = (
+            out_dir / "metrics" / filename.replace("joined", "metrics")
         )
 
         if conf["metrics"]["file_format"] == "csv":
             metric_file[dataset] = metric_file[dataset].with_suffix(".csv")
 
     # path for plots
-    plot_dir = Path(root_dir, sub_dir, "plots", conf1["nwm_configuration"])
+    plot_dir = out_dir / "plots" / conf1["nwm_configuration"]
 
     # path for crosswalk file
-    cwt_file = dict()
+    cwt_file = {}
     if conf2.get("crosswalk_file"):
         for ver1 in list(set(conf1["nwm_version"])):
             if ver1 in conf2["crosswalk_file"]:

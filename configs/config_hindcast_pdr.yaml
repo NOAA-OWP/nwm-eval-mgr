@@ -23,8 +23,8 @@ file_paths:
   fcst_config_file: '{base_dir}/inputs/nwm_forecast_configuration.yaml' # NWM forecast configuration file
   fcst_data_dir: '{base_dir}/inputs/{location_set_name}/{dataset_name}/hind_run1' # forecast data directory or file (must be specified when nwm_forecast.data_source is set to ngenCERF or hinscast)
   fcst_data_file: '01123000_output.csv' # forecast data file path pattern (must be specified when nwm_forecast.data_source is set to ngenCERF or hinscast)
-  #obs_data_file: '{base_dir}/inputs/{location_set_name}/obs/{location_set_name}_hourly_discharge_hindcast.csv' # observation data file path 
-  obs_data_dir: '{base_dir}/inputs/{location_set_name}/obs' # observation data directory; both obs_data_file and obs_data_dir can be specified; if neither is specified, usgs must be specified under flow_observation to retrieve obs data directly from USGS
+  obs_data_file: '{base_dir}/inputs/{location_set_name}/obs/{location_set_name}_hourly_discharge_hindcast.csv' # observation data file path 
+  #obs_data_dir: '{base_dir}/inputs/{location_set_name}/obs' # observation data directory; both obs_data_file and obs_data_dir can be specified; if neither is specified, usgs must be specified under flow_observation to retrieve obs data directly from USGS
   output_dir: '{base_dir}/outputs/{location_set_name}_hindcast' # output directory to store all datasets, metrics and plots
 
 nwm_forecast:
